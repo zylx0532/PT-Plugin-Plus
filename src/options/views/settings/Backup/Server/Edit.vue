@@ -19,7 +19,7 @@
         </v-toolbar>
 
         <v-card-text class="body">
-          <Editor :initData="defaultItem" @change="change" />
+          <Editor :type="type" :initData="defaultItem" @change="change" :show="show" />
         </v-card-text>
 
         <v-divider></v-divider>
@@ -57,7 +57,11 @@ export default Vue.extend({
   },
   props: {
     value: Boolean,
-    initData: Object
+    initData: Object,
+    type: {
+      type: String,
+      default: EBackupServerType.OWSS
+    }
   },
   model: {
     prop: "value",

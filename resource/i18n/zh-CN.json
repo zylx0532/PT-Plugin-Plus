@@ -26,6 +26,7 @@
       "remove": "删除",
       "clear": "清除",
       "removeConfirm": "确认要删除这条记录吗？",
+      "removeSelectedConfirm": "确认要删除这些已选中的 {count} 条记录吗？",
       "removeConfirmTitle": "删除确认",
       "clearConfirm": "确认要删除所有记录吗？",
       "id": "ID",
@@ -41,22 +42,32 @@
       "setDefault": "设为默认",
       "cancelDefault": "取消默认",
       "search": "搜索",
-      "color": "颜色"
+      "color": "颜色",
+      "orderBy": "排序字段",
+      "orderMode": {
+        "asc": "升序",
+        "desc": "降序"
+      },
+      "close": "关闭",
+      "copyed": "已复制"
     },
     "topbar": {
       "title": "@:(app.name)",
-      "navBarTip": "点击显示\/隐藏导航栏",
-      "help": "使用帮助",
-      "github": "访问 Github",
+      "navBarTip": "点击显示/隐藏导航栏",
+      "help": "帮助",
+      "github": "主页",
       "showNewTorrents": "获取各站第一页种子",
       "showNewTorrentsTip": "根据当前方案，搜索各站的第一页种子"
     },
     "navigation": {
       "dashboard": {
         "title": "概览",
+        "userData": "我的数据",
         "searchResults": "搜索结果",
         "history": "下载历史",
-        "collection": "我的收藏"
+        "collection": "我的收藏",
+        "searchResultSnapshot": "搜索结果快照",
+        "keepUploadTask": "辅种任务"
       },
       "settings": {
         "title": "参数设置",
@@ -76,7 +87,7 @@
       "support": {
         "title": "支持本项目",
         "bugReport": "Bug反馈",
-        "donate": "捐助"
+        "donate": "捐赠"
       }
     },
     "permissions": {
@@ -138,8 +149,8 @@
       }
     },
     "home": {
-      "title": "概览",
-      "getInfos": "刷新用户数据",
+      "title": "我的数据",
+      "getInfos": "刷新我的数据",
       "cancelRequest": "取消请求",
       "requesting": "正在请求",
       "siteName": "网站名称",
@@ -164,7 +175,7 @@
         "ratio": "分享率",
         "seeding": "做种数",
         "seedingSize": "做种体积",
-        "bonus": "魔力值\/积分",
+        "bonus": "魔力值/积分",
         "joinTime": "入站时间",
         "lastUpdateTime": "数据更新于",
         "status": "状态"
@@ -225,16 +236,18 @@
       "title": "搜索结果",
       "download": "下载",
       "downloadFailed": "重下失败",
-      "sendToClient": "服务器下载",
-      "sendToClientTip": "发送到下载服务器",
-      "save": "下载种子文件到本地",
+      "sendToClient": "推送",
+      "sendToClientTip": "推送到下载服务器",
+      "save": "保存",
+      "saveTip": "下载种子文件到本地",
+      "collection": "收藏",
       "searching": "正在搜索中，请稍候……",
       "cancelSearch": "取消搜索",
       "showCheckbox": "多选",
       "noTag": "无标签",
       "allSites": "全部站点",
       "multiDownloadConfirm": "当前下载的种子数量超过一个，浏览器可能会多次提示保存，是否继续？",
-      "copyToClipboard": "复制链接",
+      "copyToClipboard": "复制",
       "copyToClipboardTip": "复制下载链接到剪切板",
       "reSearch": "重新再搜索",
       "showCategory": "分类",
@@ -246,7 +259,7 @@
       "headers": {
         "site": "站点",
         "title": "标题",
-        "category": "分类\/入口",
+        "category": "分类/入口",
         "size": "大小",
         "seeders": "上传",
         "leechers": "下载",
@@ -286,13 +299,14 @@
       "torrentStatus": {
         "downloading": "正在下载",
         "sending": "正在做种",
-        "completed": "已完成，未做种"
+        "completed": "已完成，未做种",
+        "inactive": "未活动"
       }
     },
     "settings": {
       "backup": {
         "title": "参数备份与恢复",
-        "subTitle": "注：备份文件为明文，其中可能包含个人信息，请注意保管。",
+        "subTitle": "注：除非设置加密，否则备份文件为明文，其中可能包含个人信息，请注意保管。",
         "backup": "备份",
         "restore": "恢复",
         "backupToGoogle": "备份到Google",
@@ -327,19 +341,47 @@
             "title": "编辑备份服务器"
           },
           "editor": {
+            "type": "服务器类型",
             "name": "服务名称",
             "address": "服务器地址",
             "authCode": "授权码",
-            "applyAuthCode": "申请授权码"
+            "applyAuthCode": "申请授权码",
+            "loginName": "登录名",
+            "loginPwd": "登录密码",
+            "digest": "启用 Digest 认证"
           },
           "list": {
-            "noData": "暂无备份数据"
+            "noData": "暂无备份数据",
+            "backupToServer": "备份到服务器",
+            "loadBackupList": "历史记录"
           },
-          "getFileListError": "获取备份文件失败，请确认网络和备份服务器是否可用"
+          "getFileListError": "获取备份文件失败，请确认网络和备份服务器是否可用",
+          "owss": {
+            "addressTip": "完整的服务器地址，如：http://192.168.1.1:8088/storage"
+          }
         },
         "restoreAll": "恢复所有设置",
         "restoreCollection": "仅恢复收藏数据",
-        "restoreCookies": "仅恢复站点Cookies"
+        "restoreCookies": "仅恢复站点Cookies",
+        "restoreSearchResultSnapshot": "仅恢复搜索结果快照",
+        "restoreKeepUploadTask": "仅恢复辅种任务",
+        "contentNotExist": {
+          "cookies": "备份文件中不存在Cookies",
+          "collection": "备份文件中不存在收藏信息"
+        },
+        "backupItem": {
+          "base": "常规设置",
+          "userDatas": "站点数据",
+          "collection": "我的收藏",
+          "cookies": "Cookies",
+          "searchResultSnapshot": "搜索结果快照",
+          "keepUploadTask": "辅种任务"
+        },
+        "restoreErrorType": {
+          "needSecretKey": "需要密钥",
+          "errorSecretKey": "密钥错误"
+        },
+        "enterSecretKey": "请输入密钥："
       },
       "base": {
         "title": "常规设置",
@@ -402,7 +444,12 @@
           "left": "页面左侧",
           "right": "页面右侧"
         },
-        "allowBackupCookies": "当进行备份操作时，同时备份已配置站点的 Cookies；（不支持备份到Google）"
+        "allowBackupCookies": "当进行备份操作时，同时备份已配置站点的 Cookies；（不支持备份到Google）",
+        "encryptBackupData": "当进行备份时，对备份数据进行加密；（不支持备份到Google）",
+        "encryptMode": "加密方式：",
+        "encryptSecretKey": "密钥：",
+        "encryptTip": "注意：密钥仅保存在当前浏览器，不会备份，请妥善保存；加密后如密钥丢失将无法恢复数据。",
+        "createSecretKey": "随机生成"
       },
       "downloadClients": {
         "add": {
@@ -424,7 +471,7 @@
           "name": "服务器名称",
           "type": "服务器类型",
           "address": "服务器地址",
-          "addressTip": "完整的服务器地址（含端口），如：http:\/\/192.168.1.1:5000\/",
+          "addressTip": "完整的服务器地址（含端口），如：http://192.168.1.1:5000/",
           "loginName": "登录名",
           "loginPwd": "登录密码",
           "id": "ID",
@@ -498,7 +545,7 @@
           "siteHost": "将被替换为当前站点域名；",
           "example": "例：",
           "dynamic": "将会弹出输入框，由用户输入路径中 {key} 部分内容；",
-          "dynamicExample": "例：\/volume1\/<...> ，输入：test，结果 \/volume1\/test"
+          "dynamicExample": "例：/volume1/<...> ，输入：test，结果 /volume1/test"
         }
       },
       "searchSolution": {
@@ -537,13 +584,13 @@
           "defaultClient": "默认下载服务器",
           "name": "插件名称",
           "pages": "适用页面",
-          "pagesTip": "页面以'\/'开始表示网站根目录，输入完成后按回车添加，可添加多个，可以是正则表达式",
+          "pagesTip": "页面以'/'开始表示网站根目录，输入完成后按回车添加，可添加多个，可以是正则表达式",
           "scripts": "附加脚本文件",
-          "scriptsTip": "\/ 表示从资源目录根加载脚本，可添加多个",
+          "scriptsTip": "/ 表示从资源目录根加载脚本，可添加多个",
           "script": "JS脚本",
           "style": "附加样式",
           "styles": "附加样式文件",
-          "stylesTip": "\/ 表示从资源目录根加载脚本，可添加多个"
+          "stylesTip": "/ 表示从资源目录根加载脚本，可添加多个"
         },
         "index": {
           "title": "站点插件配置",
@@ -584,7 +631,7 @@
           "description": "网站描述",
           "host": "域名",
           "url": "网站地址",
-          "urlTip": "网站完整地址，如：https:\/\/www.github.com\/",
+          "urlTip": "网站完整地址，如：https://www.github.com/",
           "passkey": "密钥",
           "passkeyTip": "密钥仅用于复制下载地址操作，如果不需要用到此功能，请留空",
           "allowSearch": "允许搜索",
@@ -593,7 +640,7 @@
           "cdnTip": "如您使用的网址和系统定义的不同，可在此填写当前使用的网站地址，每行填写一个地址，第一个将做为搜索时使用的地址",
           "priority": "优先级",
           "priorityTip": "可用于搜索排序",
-          "offline": "站点已离线（停机\/关闭）"
+          "offline": "站点已离线（停机/关闭）"
         },
         "index": {
           "importAll": "一键导入站点",
@@ -618,7 +665,8 @@
           },
           "importConfig": "从文件导入",
           "importConfirm": "确认要导入 【{name}】 吗？",
-          "importDuplicateConfirm": "该站点 【{name}】 已存在，是否需要导入搜索入口和插件？"
+          "importDuplicateConfirm": "该站点 【{name}】 已存在，是否需要导入搜索入口和插件？",
+          "resetFavicons": "重置站点图标缓存"
         }
       },
       "siteSearchEntry": {
@@ -805,12 +853,12 @@
       "title": "收藏列表",
       "add": "加入收藏",
       "remove": "取消收藏",
-      "addGroup": "添加分组",
+      "addGroup": "创建分组",
       "addToGroup": "添加到分组",
       "noGroup": "<未分组>",
       "changeGroupName": "修改分组名称",
       "removeGroupConfirm": "确认要删除这个分组吗？{count} 个收藏将从这个分组中删除。",
-      "setIMDbId": "设置IMDb ID",
+      "setMovieId": "设置电影 ID，可以是 IMDB ID（如：tt123456）或豆瓣ID（如：12345678）",
       "inputGroupName": "请输入分组名称：",
       "headers": {
         "site": "来源",
@@ -818,6 +866,75 @@
         "size": "大小",
         "time": "添加时间",
         "action": "操作"
+      }
+    },
+    "searchResultSnapshot": {
+      "title": "搜索结果快照",
+      "show": "查看快照",
+      "removeConfirmTitle": "删除快照确认",
+      "removeConfirm": "确认要删除这个快照吗？",
+      "clearConfirm": "确认要清除所有快照吗？",
+      "create": "创建快照",
+      "createSuccess": "快照创建完成",
+      "createError": "快照创建失败",
+      "snapshotTime": "快照时间: {time}",
+      "headers": {
+        "key": "搜索内容",
+        "time": "时间"
+      }
+    },
+    "keepUploadTask": {
+      "title": "辅种任务",
+      "keepUpload": "辅种",
+      "removeConfirmTitle": "删除辅种任务确认",
+      "removeConfirm": "确认要删除这个辅种任务吗？",
+      "clearConfirm": "确认要清除所有辅种任务吗？",
+      "create": "生成辅种任务",
+      "createSuccess": "辅种任务创建完成，请到辅种任务列表中进行后续操作",
+      "createError": "辅种任务创建失败",
+      "noItem": "没有符合条件的种子",
+      "savePath": "保存目录：",
+      "defaultPath": "默认目录",
+      "setSavePath": "设置保存目录",
+      "torrentCount": "辅种数量：",
+      "sendBaseTorrent": "发送基准种子到下载服务器",
+      "sendOtherTorrents": "发送除基准外的其他种子到下载服务器",
+      "sendAllTorrents": "发送所有辅种到下载服务器",
+      "sendSuccess": "任务已发送",
+      "sendError": "任务发送失败",
+      "verification": "辅种验证",
+      "baseTorrent": "基准文件",
+      "otherTorrent": "辅种文件",
+      "size": "大小：",
+      "fileCount": "文件数：",
+      "sendConfirm": "是否确认要发送这 {count} 个种子？",
+      "status": {
+        "label": "状态：",
+        "downloading": "正在下载",
+        "downloaded": "下载完成",
+        "failed": "校验失败",
+        "success": "校验成功",
+        "waiting": "等待校验",
+        "downloadFailed": "下载失败"
+      },
+      "headers": {
+        "site": "站点",
+        "title": "标题",
+        "size": "大小",
+        "time": "时间"
+      }
+    },
+    "movieInfoCard": {
+      "alias": "又名：",
+      "director": "导演：",
+      "writer": "编剧：",
+      "cast": "主演：",
+      "type": "类型：",
+      "pubdate": "上映：",
+      "duration": "片长：",
+      "ratings": {
+        "douban": "豆瓣 {average} 共 {numRaters} 人参与评价",
+        "imdb": "IMDb {average} 共 {numRaters} 人参与评价"
       }
     }
   }

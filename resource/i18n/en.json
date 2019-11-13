@@ -26,6 +26,7 @@
       "remove": "Remove",
       "clear": "Clear",
       "removeConfirm": "Are you sure you want to delete this record?",
+      "removeSelectedConfirm": "Are you sure you want to delete these {count} selected records?",
       "removeConfirmTitle": "Delete confirmation",
       "clearConfirm": "Are you sure you want to delete all records?",
       "id": "ID",
@@ -41,7 +42,14 @@
       "setDefault": "Set Default",
       "cancelDefault": "Cancel Default",
       "search": "Search",
-      "color": "Color"
+      "color": "Color",
+      "orderBy": "Order By",
+      "orderMode": {
+        "asc": "ASC",
+        "desc": "DESC"
+      },
+      "close": "Close",
+      "copyed": "Copyed"
     },
     "topbar": {
       "title": "@:(app.name)",
@@ -54,9 +62,12 @@
     "navigation": {
       "dashboard": {
         "title": "Overview",
+        "userData": "My Data",
         "searchResults": "Search Results",
         "history": "Download History",
-        "collection": "Collection"
+        "collection": "Collection",
+        "searchResultSnapshot": "Search Snapshot",
+        "keepUploadTask": "Reseed Task"
       },
       "settings": {
         "title": "Settings",
@@ -138,8 +149,8 @@
       }
     },
     "home": {
-      "title": "Overview",
-      "getInfos": "Refresh user data",
+      "title": "My Data",
+      "getInfos": "Refresh my data",
       "cancelRequest": "Cancel request",
       "requesting": "Requesting",
       "siteName": "Site name",
@@ -227,7 +238,9 @@
       "downloadFailed": "Re-download failed",
       "sendToClient": "Send to server",
       "sendToClientTip": "Send torrents to download server",
-      "save": "Save torrents",
+      "save": "Save",
+      "saveTip": "Save torrents",
+      "collection": "Collection",
       "searching": "Searching, please wait...",
       "cancelSearch": "Cancel search",
       "showCheckbox": "Multiple selection",
@@ -248,9 +261,9 @@
         "title": "Title",
         "category": "Category\/Entrance",
         "size": "Size",
-        "seeders": "Seeders",
-        "leechers": "Leechers",
-        "completed": "Completed/Snatched",
+        "seeders": "S",
+        "leechers": "L",
+        "completed": "C",
         "time": "Time(≈)",
         "action": "Action"
       },
@@ -286,13 +299,14 @@
       "torrentStatus": {
         "downloading": "Downloading",
         "sending": "Sending",
-        "completed": "Completed"
+        "completed": "Completed",
+        "inactive": "Inactive"
       }
     },
     "settings": {
       "backup": {
         "title": "Parameter backup and recovery",
-        "subTitle": "Note: The backup file is in plain text and may contain personal information. Please take care of it.",
+        "subTitle": "Note: Unless encryption is set, the backup file is in plain text and may contain personal information. Please take care of it.",
         "backup": "Backup",
         "restore": "Restore",
         "backupToGoogle": "Backup To Google",
@@ -327,19 +341,47 @@
             "title": "Edit Backup Server"
           },
           "editor": {
-            "name": "Service name",
+            "type": "Server Type",
+            "name": "Server name",
             "address": "Server address",
             "authCode": "Authorization Code",
-            "applyAuthCode": "Apply"
+            "applyAuthCode": "Apply",
+            "loginName": "log-in name",
+            "loginPwd": "login password",
+            "digest": "Use Digest Authorization"
           },
           "list": {
-            "noData": "No backup data yet"
+            "noData": "No backup data yet",
+            "backupToServer": "Backup to server",
+            "loadBackupList": "Load backup list"
           },
-          "getFileListError": "Failed to get the backup file, please confirm whether the network and backup server are available"
+          "getFileListError": "Failed to get the backup file, please confirm whether the network and backup server are available",
+          "owss": {
+            "addressTip": "The server address contains the port, such as: http:\/\/192.168.1.1:8088\/storage"
+          }
         },
         "restoreAll": "Restore All",
         "restoreCollection": "Restore Collection Only",
-        "restoreCookies": "Restore Cookies Only"
+        "restoreCookies": "Restore Cookies Only",
+        "restoreSearchResultSnapshot": "Restore Search Result Snapshot Only",
+        "restoreKeepUploadTask": "Restore Reseed Task Only",
+        "contentNotExist": {
+          "cookies": "Cookies not exist in the backup file",
+          "collection": "Collection not exists in the backup file"
+        },
+        "backupItem": {
+          "base": "General",
+          "userDatas": "User Datas",
+          "collection": "Collection",
+          "cookies": "Cookies",
+          "searchResultSnapshot": "Search Result Snapshot",
+          "keepUploadTask": "Reseed Task"
+        },
+        "restoreErrorType": {
+          "needSecretKey": "Need Secret Key",
+          "errorSecretKey": "Error Secret Key"
+        },
+        "enterSecretKey": "Please enter a Secret key:"
       },
       "base": {
         "title": "General",
@@ -402,7 +444,12 @@
           "left": " Left side of page",
           "right": "Rigth side of page"
         },
-        "allowBackupCookies": "Backup cookies of the configured site. (Backup to Google is not supported)"
+        "allowBackupCookies": "Backup cookies of the configured site. (Backup to Google is not supported)",
+        "encryptBackupData": "Encrypt backup data. (Backup to Google is not supported)",
+        "encryptMode": "Encryption: ",
+        "encryptSecretKey": "Secret Key:",
+        "encryptTip": "Note: The key is only saved in the current browser and will not be backed up. Please save it properly. If the key is lost after encryption, the data will not be recovered.",
+        "createSecretKey": "Create"
       },
       "downloadClients": {
         "add": {
@@ -618,7 +665,8 @@
           },
           "importConfig": "Import from config",
           "importConfirm": "Are you sure you want to import [{name}] ?",
-          "importDuplicateConfirm": "The site {name} already exists. Do you need to import search entrys and plugins?"
+          "importDuplicateConfirm": "The site {name} already exists. Do you need to import search entrys and plugins?",
+          "resetFavicons": "Reset site favicons"
         }
       },
       "siteSearchEntry": {
@@ -805,12 +853,12 @@
       "title": "Collection list",
       "add": "Add to collection",
       "remove": "Remove from collection",
-      "addGroup": "Add Group",
+      "addGroup": "Create Group",
       "addToGroup": "Add To Group",
       "noGroup": "<No Group>",
       "changeGroupName": "Change the group name",
       "removeGroupConfirm": "Are you sure you want to delete this group?{count} collections will be removed from this group.",
-      "setIMDbId": "Set IMDb ID",
+      "setMovieId": "Enter IMDb ID (e.g. tt123567) or doubanId (e.g. 12345678):",
       "inputGroupName": "Enter the group name:",
       "headers": {
         "site": "Site",
@@ -818,6 +866,74 @@
         "size": "Size",
         "time": "Add time",
         "action": "Action"
+      }
+    },
+    "searchResultSnapshot": {
+      "title": "Search Result Snapshot",
+      "show": "Show Snapshot",
+      "removeConfirmTitle": "Delete confirmation",
+      "removeConfirm": "Are you sure you want to delete this Snapshot?",
+      "clearConfirm": "Are you sure you want to delete all Snapshot?",
+      "create": "Create Snapshot",
+      "createSuccess": "Create Snapshot Success",
+      "createError": "Create Snapshot Error",
+      "snapshotTime": "Snapshot Time: {time}",
+      "headers": {
+        "key": "Search Key",
+        "time": "Time"
+      }
+    },
+    "keepUploadTask": {
+      "title": "Reseed Task",
+      "keepUpload": "Reseed",
+      "removeConfirmTitle": "Delete confirmation",
+      "removeConfirm": "Are you sure you want to delete this Task?",
+      "clearConfirm": "Are you sure you want to delete all Task?",
+      "create": "Create Reseed Task",
+      "createSuccess": "Task creation completed",
+      "createError": "Task creation failed",
+      "noItem": "No matching seeds",
+      "savePath": "Save Path: ",
+      "defaultPath": "Default Path",
+      "setSavePath": "Set Save Path",
+      "torrentCount": "Reseed count",
+      "sendBaseTorrent": "Send First Torrent",
+      "sendOtherTorrents": "Send Other Torrents",
+      "sendAllTorrents": "Send All Torrents",
+      "sendSuccess": "Send Success",
+      "sendError": "Send Error",
+      "verification": "Verification",
+      "baseTorrent": "Base Torrent",
+      "otherTorrent": "Other Torrent",
+      "size": "Size: ",
+      "fileCount": "Files: ",
+      "sendConfirm": "Are you sure you want to send these {count} torrents?",
+      "status": {
+        "label": "Status: ",
+        "downloading": "Downloading",
+        "failed": "Verification failed",
+        "success": "Verify successful",
+        "waiting": "Waiting for verification",
+        "downloadFailed": "Download Failed"
+      },
+      "headers": {
+        "site": "Site",
+        "title": "Title",
+        "size": "Size",
+        "time": "Time"
+      }
+    },
+    "movieInfoCard": {
+      "alias": "Alias: ",
+      "director": "Director: ",
+      "writer": "Writer: ",
+      "cast": "Cast: ",
+      "type": "Type: ",
+      "pubdate": "Pubdate: ",
+      "duration": "Duration: ",
+      "ratings": {
+        "douban": "Douban {average} ({numRaters})",
+        "imdb": "IMDb {average} ({numRaters})"
       }
     }
   }

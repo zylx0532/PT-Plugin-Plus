@@ -10,7 +10,9 @@ import {
   ERequestResultType,
   SearchEntryConfigArea,
   SearchEntryConfig,
-  ISearchPayload
+  ISearchPayload,
+  SiteCategories,
+  SiteCategory
 } from "@/interface/common";
 import { APP } from "@/service/api";
 import { SiteService } from "./site";
@@ -141,6 +143,10 @@ export class Searcher {
               area.keyAutoMatch &&
               new RegExp(area.keyAutoMatch, "").test(key)
             ) {
+              // 是否替换默认页面
+              if (area.page) {
+                siteSearchPage = area.page;
+              }
               autoMatched = true;
               // 如果有定义查询字符串，则替换默认的查询字符串
               if (area.queryString) {
@@ -212,11 +218,12 @@ export class Searcher {
         }
         if (searchEntryConfig) {
           entry.parseScriptFile =
-            entry.parseScriptFile || searchEntryConfig.parseScriptFile;
-          entry.resultType = entry.resultType || searchEntryConfig.resultType;
+            searchEntryConfig.parseScriptFile || entry.parseScriptFile;
+          entry.resultType = searchEntryConfig.resultType || entry.resultType;
           entry.resultSelector =
-            entry.resultSelector || searchEntryConfig.resultSelector;
-          entry.headers = entry.headers || searchEntryConfig.headers;
+            searchEntryConfig.resultSelector || entry.resultSelector;
+          entry.headers = searchEntryConfig.headers || entry.headers;
+          entry.asyncParse = searchEntryConfig.asyncParse || entry.asyncParse;
         }
 
         // 判断是否指定了搜索页和用于获取搜索结果的脚本
@@ -274,9 +281,7 @@ export class Searcher {
             scriptPath = `${searchConfig.rootPath}${scriptPath}`;
           }
 
-          if (!entry.parseScript) {
-            entry.parseScript = this.parseScriptCache[scriptPath];
-          }
+          entry.parseScript = this.parseScriptCache[scriptPath];
 
           if (!entry.parseScript) {
             console.log("searchTorrent: getScriptContent", scriptPath);
@@ -288,7 +293,7 @@ export class Searcher {
                 this.getSearchResult(
                   url,
                   site,
-                  entry,
+                  PPF.clone(entry),
                   searchConfig.torrentTagSelectors
                 )
                   .then((result: any) => {
@@ -326,7 +331,7 @@ export class Searcher {
             this.getSearchResult(
               url,
               site,
-              entry,
+              PPF.clone(entry),
               searchConfig.torrentTagSelectors
             )
               .then((result: any) => {
@@ -426,7 +431,7 @@ export class Searcher {
               return;
             }
 
-            const options = {
+            let options: any = {
               results: [],
               responseText: result,
               site,
@@ -437,13 +442,27 @@ export class Searcher {
               errorMsg: "",
               isLogged: false,
               status: ESearchResultParseStatus.success,
-              searcher: this
+              searcher: this,
+              url
             };
 
             // 执行获取结果的脚本
             try {
               if (entry.parseScript) {
-                eval(entry.parseScript);
+                // 异步脚本，由脚本负责调用 reject 和 resolve
+                if (entry.asyncParse) {
+                  options = Object.assign(
+                    {
+                      reject,
+                      resolve
+                    },
+                    options
+                  );
+                  eval(entry.parseScript);
+                  return;
+                } else {
+                  eval(entry.parseScript);
+                }
               }
               if (
                 options.errorMsg ||
@@ -661,5 +680,48 @@ export class Searcher {
       selector,
       site.searchEntryConfig.fieldSelector
     );
+  }
+
+  /**
+   * 根据指定信息获取分类
+   * @param site 站点
+   * @param page 当前搜索页面
+   * @param id 分类ID
+   */
+  public getCategoryById(site: Site, page: string, id: string) {
+    let result = {};
+    if (site.categories) {
+      site.categories.forEach((item: SiteCategories) => {
+        if (
+          item.category &&
+          (item.entry == "*" || page.indexOf(item.entry as string))
+        ) {
+          let category = item.category.find((c: SiteCategory) => {
+            return c.id == id;
+          });
+
+          if (category) {
+            result = category;
+          }
+        }
+      });
+    }
+    return result;
+  }
+
+  /**
+   * cloudflare Email 解码方法，来自 https://usamaejaz.com/cloudflare-email-decoding/
+   * @param {*} encodedString
+   */
+  public cfDecodeEmail(encodedString: string) {
+    var email = "",
+      r = parseInt(encodedString.substr(0, 2), 16),
+      n,
+      i;
+    for (n = 2; encodedString.length - n; n += 2) {
+      i = parseInt(encodedString.substr(n, 2), 16) ^ r;
+      email += String.fromCharCode(i);
+    }
+    return email;
   }
 }

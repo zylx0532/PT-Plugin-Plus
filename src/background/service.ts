@@ -20,6 +20,9 @@ import { OmniBox } from "./omnibox";
 import { i18nService } from "./i18n";
 import DownloadQuene from "./downloadQuene";
 import Collection from "./collection";
+import SearchResultSnapshot from "./searchResultSnapshot";
+import KeepUploadTask from "./keepUploadTask";
+
 /**
  * PT 助手后台服务类
  */
@@ -46,6 +49,10 @@ export default class PTPlugin {
   public downloadQuene: DownloadQuene = new DownloadQuene(this);
   // 收藏
   public collection: Collection = new Collection();
+  // 搜索结果快照
+  public searchResultSnapshot: SearchResultSnapshot = new SearchResultSnapshot();
+  // 辅种任务
+  public keepUploadTask: KeepUploadTask = new KeepUploadTask();
 
   private reloadCount: number = 0;
   private autoRefreshUserDataTimer: number = 0;
@@ -503,10 +510,16 @@ export default class PTPlugin {
         (message: any, sender: chrome.runtime.MessageSender, callback) => {
           this.requestMessage(message, sender)
             .then((result: any) => {
-              callback && callback(result);
+              callback &&
+                callback({
+                  resolve: result
+                });
             })
             .catch((result: any) => {
-              callback && callback(result);
+              callback &&
+                callback({
+                  reject: result
+                });
             });
           // 这句不能去掉
           return true;

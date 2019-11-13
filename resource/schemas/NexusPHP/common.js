@@ -143,7 +143,7 @@
           }
           let urls = this.getDownloadURLs();
 
-          if (!urls.length) {
+          if (!urls.length || typeof urls == "string") {
             error(urls);
             return;
           }
@@ -211,7 +211,7 @@
           }
           let urls = this.getDownloadURLs();
 
-          if (!urls.length) {
+          if (!urls.length || typeof urls == "string") {
             error(urls);
             return;
           }
@@ -657,6 +657,19 @@
             }
           }
 
+          let doubanId = PTService.getFieldValue("doubanId");
+
+          if (!doubanId) {
+            const link = $("a[href*='movie.douban.com/subject/']:first");
+            if (link.length > 0) {
+              let match = link.attr("href").match(/subject\/(\d+)/);
+
+              if (match && match.length >= 2) {
+                doubanId = match[1];
+              }
+            }
+          }
+
           const data = {
             title: title,
             url: this.getDownloadURL(),
@@ -665,7 +678,8 @@
             size: PTService.getFieldValue("size"),
             subTitle: PTService.getFieldValue("subTitle"),
             movieInfo: {
-              imdbId: imdbId
+              imdbId: imdbId,
+              doubanId: doubanId
             }
           };
 
@@ -993,7 +1007,7 @@
 
       const savePath = downloadOptions
         ? PTService.pathHandler.getSavePath(
-            downloadOptions.savePath,
+            downloadOptions.savePath || downloadOptions.path,
             PTService.site
           )
         : "";
@@ -1087,7 +1101,7 @@
             }
           })
           .catch(error => {
-            console.log("");
+            console.log(error);
           });
       }
     }
@@ -1135,12 +1149,20 @@
         menus.push({
           title: title,
           fn: () => {
+            // 克隆是为了多次选择时，不覆盖原来的值
+            let _item = PPF.clone(item);
             console.log(item);
-            item.path = PTService.pathHandler.getSavePath(
-              item.path,
+            let savePath = PTService.pathHandler.getSavePath(
+              _item.path,
               PTService.site
             );
-            _this.startDownloadURLs(success, error, item);
+            if (savePath === false) {
+              // "用户取消操作"
+              error(_this.t("userCanceled"));
+              return;
+            }
+            _item.path = savePath;
+            _this.startDownloadURLs(success, error, _item);
           }
         });
       }
@@ -1181,6 +1203,21 @@
         left: "-=20px",
         top: "+=10px"
       });
+    }
+
+    /**
+     * 获取完整的URL地址
+     * @param {string} url
+     */
+    getFullURL(url) {
+      if (url.substr(0, 2) === "//") {
+        url = `${location.protocol}${url}`;
+      } else if (url.substr(0, 1) === "/") {
+        url = `${location.origin}${url}`;
+      } else if (url.substr(0, 4) !== "http") {
+        url = `${location.origin}/${url}`;
+      }
+      return url;
     }
   }
 

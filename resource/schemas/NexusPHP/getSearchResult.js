@@ -304,6 +304,14 @@ if (!"".getQueryString) {
         }
       }
 
+      // 对title进行处理，防止出现cf的email protect
+      let cfemail = title.find("span.__cf_email__");
+      if (cfemail.length > 0) {
+        cfemail.each((index, el) => {
+          $(el).replaceWith(Searcher.cfDecodeEmail($(el).data("cfemail")));
+        });
+      }
+
       return title;
     }
 
@@ -355,6 +363,11 @@ if (!"".getQueryString) {
               subTitle = $(".torrentname > tbody > tr:eq(1)", row)
                 .find(".tooltip")
                 .text();
+              break;
+
+            case "whu.pt":
+            case "hudbt.hust.edu.cn":
+              subTitle = $("h3", row).text();
               break;
 
             default:

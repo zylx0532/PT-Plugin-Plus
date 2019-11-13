@@ -9,7 +9,9 @@ import {
   EUserDataRequestStatus,
   EBeforeSearchingItemSearchMode,
   EBackupServerType,
-  EPluginPosition
+  EPluginPosition,
+  EWorkingStatus,
+  EEncryptMode
 } from "./enum";
 
 /**
@@ -79,6 +81,7 @@ export interface IBackupServer {
   loginName?: string;
   loginPwd?: string;
   authCode?: string;
+  digest?: boolean;
 }
 
 /**
@@ -152,6 +155,12 @@ export interface Options {
   defaultCollectionGroupId?: string;
   // 允许备份站点 cookies
   allowBackupCookies?: boolean;
+  // 加密备份的数据
+  encryptBackupData?: boolean;
+  // 加密密钥，本项内容备份时清除
+  encryptSecretKey?: string;
+  // 加密方式
+  encryptMode?: EEncryptMode;
 }
 
 // 在搜索之前一些选项配置
@@ -339,6 +348,7 @@ export interface SearchResultItem {
   progress?: number;
   // 状态
   status?: number;
+  host?: string;
 }
 
 /**
@@ -351,6 +361,8 @@ export interface SearchEntryConfigArea {
   keyAutoMatch?: string;
   replaceKey?: string[];
   parseScript?: string;
+  // 替换默认页面
+  page?: string;
 }
 
 // 搜索入口默认配置
@@ -361,6 +373,8 @@ export interface SearchEntryConfig {
   queryString?: string;
   parseScriptFile?: string;
   parseScript?: string;
+  // 是否异步解析脚本
+  asyncParse?: boolean;
   resultSelector?: string;
   area?: SearchEntryConfigArea[];
   headers?: Dictionary<any>;
@@ -375,6 +389,8 @@ export interface SearchEntry {
   resultType?: ERequestResultType;
   parseScriptFile?: string;
   parseScript?: string;
+  // 是否异步解析脚本
+  asyncParse?: boolean;
   resultSelector?: string;
   enabled?: boolean;
   tagSelectors?: any[];
@@ -476,6 +492,7 @@ export interface IManifest {
   version: string;
   time: number;
   hash?: string;
+  encryptMode?: EEncryptMode;
 }
 
 /**
@@ -496,7 +513,7 @@ export interface ICollection {
     title: string;
     alt_title: string;
     imdbId?: string;
-    doubanId?: string | number;
+    doubanId?: string;
     image?: string;
     link?: string;
     year?: number;
@@ -545,4 +562,48 @@ export interface ICookies {
   host: string;
   url: string;
   cookies: chrome.cookies.Cookie[];
+}
+
+export interface IURL {
+  href: string;
+  protocol: string;
+  host: string;
+  port?: number;
+  query?: string;
+  params?: string[];
+  hash?: string;
+  path: string;
+  segments: string;
+  origin: string;
+}
+
+export interface IWorkingStatusItem {
+  key: string;
+  status?: EWorkingStatus;
+  title: string;
+}
+
+export interface ISearchResultSnapshot {
+  id: string;
+  key: string;
+  time: number;
+  searchPayload?: ISearchPayload;
+  result: SearchResultItem[];
+}
+
+export interface IBackupRawData {
+  options: any;
+  userData: any;
+  collection: any;
+  cookies?: any;
+  searchResultSnapshot?: any;
+  keepUploadTask?: any;
+}
+
+export interface IKeepUploadTask {
+  id: string;
+  time: number;
+  title: string;
+  downloadOptions: DownloadOptions;
+  items: any[];
 }

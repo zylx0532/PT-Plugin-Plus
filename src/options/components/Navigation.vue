@@ -1,23 +1,25 @@
 <template>
   <!-- 导航栏 -->
-  <v-navigation-drawer clipped fixed v-model="drawer" app>
+  <v-navigation-drawer clipped fixed v-model="drawer" app width="220">
     <v-list v-for="(group,index) in navs" :key="index" dense>
       <v-subheader v-if="group.title" class="grey--text text--darken-1">{{ $t(group.title) }}</v-subheader>
-      <v-list-tile
-        :to="item.key"
-        v-for="(item, index) in group.items"
-        :key="index"
-        :href="item.url"
-        :target="item.url?'_blank':''"
-        rel="noopener noreferrer nofollow"
-      >
-        <v-list-tile-action class="ml-3">
-          <v-icon>{{item.icon}}</v-icon>
-        </v-list-tile-action>
-        <v-list-tile-content>
-          <v-list-tile-title>{{ $t(item.title) }}</v-list-tile-title>
-        </v-list-tile-content>
-      </v-list-tile>
+      <template v-for="(item, index) in group.items">
+        <v-list-tile
+          v-if="item.visible!==false"
+          :to="item.key"
+          :key="index"
+          :href="item.url"
+          :target="item.url?'_blank':''"
+          rel="noopener noreferrer nofollow"
+        >
+          <v-list-tile-action style="min-width: 42px;margin-left: 13px;">
+            <v-icon>{{item.icon}}</v-icon>
+          </v-list-tile-action>
+          <v-list-tile-content>
+            <v-list-tile-title>{{ $t(item.title) }}</v-list-tile-title>
+          </v-list-tile-content>
+        </v-list-tile>
+      </template>
     </v-list>
   </v-navigation-drawer>
 </template>
@@ -48,7 +50,7 @@ export default Vue.extend({
           key: "group-",
           items: [
             {
-              title: "navigation.dashboard.title",
+              title: "navigation.dashboard.userData",
               icon: "dashboard",
               key: "/home"
             },
@@ -56,6 +58,11 @@ export default Vue.extend({
               title: "navigation.dashboard.searchResults",
               icon: "search",
               key: "/search-torrent"
+            },
+            {
+              title: "navigation.dashboard.searchResultSnapshot",
+              icon: "add_a_photo",
+              key: "/search-result-snapshot"
             },
             {
               title: "navigation.dashboard.history",
@@ -66,6 +73,11 @@ export default Vue.extend({
               title: "navigation.dashboard.collection",
               icon: "favorite",
               key: "/collection"
+            },
+            {
+              title: "navigation.dashboard.keepUploadTask",
+              icon: "merge_type",
+              key: "/keep-upload-task"
             }
           ]
         },
@@ -121,22 +133,6 @@ export default Vue.extend({
               title: "navigation.thanks.specialThanksTo",
               icon: "people",
               key: "/dev-team"
-            }
-          ]
-        },
-        {
-          title: "navigation.support.title",
-          items: [
-            {
-              title: "navigation.support.bugReport",
-              icon: "bug_report",
-              key: "",
-              url: "https://github.com/ronggang/PT-Plugin-Plus/issues"
-            },
-            {
-              title: "navigation.support.donate",
-              icon: "free_breakfast",
-              key: "/donate"
             }
           ]
         }

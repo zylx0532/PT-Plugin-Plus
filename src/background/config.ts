@@ -12,7 +12,8 @@ import {
   IBackupServer,
   EBackupServerType,
   EUserDataRange,
-  EPluginPosition
+  EPluginPosition,
+  IBackupRawData
 } from "@/interface/common";
 import { API, APP } from "@/service/api";
 import localStorage from "@/service/localStorage";
@@ -20,8 +21,11 @@ import { SyncStorage } from "./syncStorage";
 import { PPF } from "@/service/public";
 import dayjs from "dayjs";
 import { OWSS } from "./plugins/OWSS";
+import { WebDAV } from "./plugins/WebDAV";
 import PTPlugin from "./service";
 import { BackupFileParser } from "@/service/backupFileParser";
+import { Favicon } from "@/service/favicon";
+import FileSaver from "file-saver";
 
 type Service = PTPlugin;
 
@@ -32,6 +36,7 @@ class Config {
   private name: string = EConfigKey.default;
   private localStorage: localStorage = new localStorage();
   public syncStorage: SyncStorage = new SyncStorage();
+  public favicon: Favicon = new Favicon();
 
   public schemas: any[] = [];
   public sites: any[] = [];
@@ -101,7 +106,9 @@ class Config {
     // 启用后台下载任务
     enableBackgroundDownload: false,
     // 助手工具栏显示位置
-    position: EPluginPosition.right
+    position: EPluginPosition.right,
+    // 是否加密存储备份数据
+    encryptBackupData: false
   };
 
   public uiOptions: UIOptions = {};
@@ -115,6 +122,40 @@ class Config {
       this.options = options;
     }
     this.localStorage.set(this.name, this.cleaningOptions(this.options));
+  }
+
+  /**
+   * 获取站点图标并缓存
+   */
+  public getFavicons(): Promise<any> {
+    return new Promise<any>((resolve?: any, reject?: any) => {
+      let urls: string[] = [];
+      this.sites.forEach((site: Site) => {
+        urls.push(site.activeURL || site.url || "");
+      });
+
+      if (this.options.sites) {
+        this.options.sites.forEach((site: Site) => {
+          urls.push(site.activeURL || site.url || "");
+        });
+      }
+
+      this.favicon.gets(urls).then((results: any[]) => {
+        results.forEach((result: any) => {
+          let site = this.options.sites.find((item: Site) => {
+            return item.host === result.host;
+          });
+
+          if (site) {
+            site.icon = result.data;
+          }
+        });
+
+        this.save();
+        this.service.options = this.options;
+        resolve(this.options);
+      });
+    });
   }
 
   /**
@@ -161,6 +202,14 @@ class Config {
               }
             });
           }
+        }
+
+        if (
+          PPF.isExtensionMode &&
+          item.icon &&
+          item.icon.substr(0, 10) === "data:image"
+        ) {
+          delete item.icon;
         }
       });
     }
@@ -344,6 +393,10 @@ class Config {
           );
         }
       });
+
+    if (PPF.isExtensionMode) {
+      this.getFavicons();
+    }
 
     console.log(this.options);
   }
@@ -650,6 +703,48 @@ class Config {
   }
 
   /**
+   * 获取备份原始数据，用于插件背景页和前端传输
+   */
+  public getBackupRawData(): Promise<any> {
+    return new Promise<any>((resolve?: any, reject?: any) => {
+      try {
+        const rawUserData = this.service.userData.get("", EUserDataRange.all);
+        const rawOptions = this.cleaningOptions(this.service.options);
+
+        delete rawOptions.system;
+
+        let rawData: IBackupRawData = {
+          options: rawOptions,
+          userData: rawUserData,
+          collection: {
+            items: this.service.collection.items,
+            groups: this.service.collection.groups
+          },
+          cookies: undefined,
+          searchResultSnapshot: this.service.searchResultSnapshot.items,
+          keepUploadTask: this.service.keepUploadTask.items
+        };
+
+        // 是否备份站点 Cookies
+        if (this.service.options.allowBackupCookies) {
+          this.getAllSiteCookies()
+            .then(result => {
+              rawData.cookies = result;
+              resolve(rawData);
+            })
+            .catch(() => {
+              resolve(rawData);
+            });
+        } else {
+          resolve(rawData);
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
    * 创建备份文件
    * @param fileName
    */
@@ -657,7 +752,7 @@ class Config {
     return new Promise<any>((resolve?: any, reject?: any) => {
       this.getBackupFileBlob()
         .then(blob => {
-          saveAs(blob, fileName || this.getNewBackupFileName());
+          FileSaver.saveAs(blob, fileName || this.getNewBackupFileName());
           resolve(true);
         })
         .catch(error => {
@@ -672,46 +767,17 @@ class Config {
   public getBackupFileBlob(): Promise<any> {
     return new Promise<any>((resolve?: any, reject?: any) => {
       try {
-        const rawUserData = this.service.userData.get("", EUserDataRange.all);
-        const rawOptions = this.cleaningOptions(this.service.options);
-
-        delete rawOptions.system;
-
-        let rawData = {
-          options: rawOptions,
-          userData: rawUserData,
-          collection: {
-            items: this.service.collection.items,
-            groups: this.service.collection.groups
-          },
-          cookies: undefined
-        };
-
-        // 是否备份站点 Cookies
-        if (this.service.options.allowBackupCookies) {
-          this.getAllSiteCookies()
-            .then(result => {
-              rawData.cookies = result;
-              this.backupFileParser
-                .createBackupFileBlob(rawData)
-                .then((blob: any) => {
-                  resolve(blob);
-                });
-            })
-            .catch(() => {
-              this.backupFileParser
-                .createBackupFileBlob(rawData)
-                .then((blob: any) => {
-                  resolve(blob);
-                });
-            });
-        } else {
-          this.backupFileParser
-            .createBackupFileBlob(rawData)
-            .then((blob: any) => {
-              resolve(blob);
-            });
-        }
+        this.getBackupRawData()
+          .then((rawData: any) => {
+            this.backupFileParser
+              .createBackupFileBlob(rawData)
+              .then((blob: any) => {
+                resolve(blob);
+              });
+          })
+          .catch(error => {
+            reject(error);
+          });
       } catch (error) {
         reject(error);
       }
@@ -782,24 +848,26 @@ class Config {
   public restoreCookies(datas: any[]): Promise<any> {
     return new Promise<any>((resolve?: any, reject?: any) => {
       let requests: any[] = [];
+
+      // 需要保留的内容
+      const keepFields = [
+        "name",
+        "value",
+        "domain",
+        "path",
+        "secure",
+        "httpOnly",
+        "expirationDate"
+      ];
       datas.forEach((item: any) => {
         item.cookies.forEach((cookie: any) => {
           let options = PPF.clone(cookie);
 
-          if (options.storeId !== undefined) {
-            delete options.storeId;
-          }
-
-          if (options.hostOnly !== undefined) {
-            delete options.hostOnly;
-          }
-
-          if (options.sameSite !== undefined) {
-            delete options.sameSite;
-          }
-
-          if (options.session !== undefined) {
-            delete options.session;
+          // 删除不需要的键
+          for (const key in options) {
+            if (options.hasOwnProperty(key) && !keepFields.includes(key)) {
+              delete options[key];
+            }
           }
 
           options.url = item.url;
@@ -809,9 +877,13 @@ class Config {
       });
 
       // 不管是否成功，都返回
-      Promise.all(requests).finally(() => {
-        resolve();
-      });
+      Promise.all(requests)
+        .then(() => {
+          resolve();
+        })
+        .catch(() => {
+          resolve();
+        });
     });
   }
 
@@ -873,9 +945,7 @@ class Config {
   }
 
   private getNewBackupFileName(): string {
-    return (
-      "PT-Plugin-Plus-Backup-" + dayjs().format("YYYY-MM-DD HH:mm:ss") + ".zip"
-    );
+    return PPF.getNewBackupFileName();
   }
 
   /**
@@ -887,6 +957,7 @@ class Config {
     return new Promise<any>((resolve?: any, reject?: any) => {
       const time = dayjs().valueOf();
       const fileName = this.getNewBackupFileName();
+      let service: OWSS | WebDAV | null = null;
       this.getBackupFileBlob()
         .then(blob => {
           const formData = new FormData();
@@ -895,22 +966,30 @@ class Config {
 
           switch (server.type) {
             case EBackupServerType.OWSS:
-              new OWSS(server)
-                .add(formData)
-                .then(result => {
-                  resolve({
-                    time,
-                    fileName
-                  });
-                })
-                .catch(error => {
-                  reject(error);
-                });
+              service = new OWSS(server);
+              break;
+
+            case EBackupServerType.WebDAV:
+              service = new WebDAV(server);
               break;
 
             default:
               reject("暂不支持");
               break;
+          }
+
+          if (service) {
+            service
+              .add(formData)
+              .then(result => {
+                resolve({
+                  time,
+                  fileName
+                });
+              })
+              .catch(error => {
+                reject(error);
+              });
           }
         })
         .catch(error => {
@@ -926,28 +1005,42 @@ class Config {
    */
   public restoreFromServer(server: IBackupServer, path: string): Promise<any> {
     return new Promise<any>((resolve?: any, reject?: any) => {
+      let service: OWSS | WebDAV | null = null;
+
       switch (server.type) {
         case EBackupServerType.OWSS:
-          new OWSS(server)
-            .get(path)
-            .then(data => {
-              this.backupFileParser
-                .loadZipData(data)
-                .then(result => {
-                  resolve(result);
-                })
-                .catch(error => {
-                  reject(error);
-                });
-            })
-            .catch(error => {
-              reject(error);
-            });
+          service = new OWSS(server);
+          break;
+
+        case EBackupServerType.WebDAV:
+          service = new WebDAV(server);
           break;
 
         default:
           reject("暂不支持");
           break;
+      }
+
+      if (service) {
+        service
+          .get(path)
+          .then(data => {
+            this.backupFileParser
+              .loadZipData(
+                data,
+                this.service.i18n.t("settings.backup.enterSecretKey"),
+                this.service.options.encryptSecretKey
+              )
+              .then((result: any) => {
+                resolve(result);
+              })
+              .catch((error: any) => {
+                reject(error);
+              });
+          })
+          .catch(error => {
+            reject(error);
+          });
       }
     });
   }
@@ -962,21 +1055,30 @@ class Config {
     options: any = {}
   ): Promise<any> {
     return new Promise<any>((resolve?: any, reject?: any) => {
+      let service: OWSS | WebDAV | null = null;
       switch (server.type) {
         case EBackupServerType.OWSS:
-          new OWSS(server)
-            .list(options)
-            .then(result => {
-              resolve(result);
-            })
-            .catch(error => {
-              reject(error);
-            });
+          service = new OWSS(server);
+          break;
+
+        case EBackupServerType.WebDAV:
+          service = new WebDAV(server);
           break;
 
         default:
           reject("暂不支持");
           break;
+      }
+
+      if (service) {
+        service
+          .list(options)
+          .then(result => {
+            resolve(result);
+          })
+          .catch(error => {
+            reject(error);
+          });
       }
     });
   }
@@ -991,21 +1093,64 @@ class Config {
     path: string
   ): Promise<any> {
     return new Promise<any>((resolve?: any, reject?: any) => {
+      let service: OWSS | WebDAV | null = null;
       switch (server.type) {
         case EBackupServerType.OWSS:
-          new OWSS(server)
-            .delete(path)
-            .then(result => {
-              resolve(result);
-            })
-            .catch(error => {
-              reject(error);
-            });
+          service = new OWSS(server);
+          break;
+
+        case EBackupServerType.WebDAV:
+          service = new WebDAV(server);
           break;
 
         default:
           reject("暂不支持");
           break;
+      }
+
+      if (service) {
+        service
+          .delete(path)
+          .then(result => {
+            resolve(result);
+          })
+          .catch(error => {
+            reject(error);
+          });
+      }
+    });
+  }
+
+  /**
+   * 测试指定的服务器是否可连接
+   * @param server
+   */
+  public testBackupServerConnectivity(server: IBackupServer): Promise<any> {
+    return new Promise<any>((resolve?: any, reject?: any) => {
+      let service: OWSS | WebDAV | null = null;
+      switch (server.type) {
+        case EBackupServerType.OWSS:
+          service = new OWSS(server);
+          break;
+
+        case EBackupServerType.WebDAV:
+          service = new WebDAV(server);
+          break;
+
+        default:
+          reject("暂不支持");
+          break;
+      }
+
+      if (service) {
+        service
+          .ping()
+          .then(result => {
+            resolve(result);
+          })
+          .catch(error => {
+            reject(error);
+          });
       }
     });
   }

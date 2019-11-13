@@ -10,6 +10,7 @@
     <v-icon v-if="haveSuccess" color="success" small>done</v-icon>
     <v-icon v-else-if="haveError" color="red" small>close</v-icon>
     <v-icon v-else small :title="$t('collection.addToGroup')">{{ iconText }}</v-icon>
+    {{ label }}
   </v-btn>
 </template>
 <script lang="ts">
@@ -43,6 +44,10 @@ export default Vue.extend({
     color: {
       type: String,
       default: "success"
+    },
+    label: {
+      type: String,
+      default: ""
     }
   },
 

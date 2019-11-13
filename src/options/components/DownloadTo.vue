@@ -5,11 +5,14 @@
     :small="small"
     :loading="loading"
     @click.stop="showSiteContentMenus"
-    :title="$t('searchTorrent.sendToClient')"
+    :class="[mini?'btn-mini':'']"
+    :title="title||$t('searchTorrent.sendToClientTip')"
+    :color="color"
   >
     <v-icon v-if="haveSuccess" color="success" small>done</v-icon>
     <v-icon v-else-if="haveError" color="red" small>close</v-icon>
     <v-icon v-else small>{{ iconText }}</v-icon>
+    <span v-if="!!label" class="ml-2">{{ label }}</span>
   </v-btn>
 </template>
 <script lang="ts">
@@ -34,6 +37,8 @@ export default Vue.extend({
     flat: Boolean,
     icon: Boolean,
     small: Boolean,
+    mini: Boolean,
+    color: String,
     iconText: {
       type: String,
       default: "cloud_download"
@@ -46,7 +51,11 @@ export default Vue.extend({
           url: String
         };
       }
-    }
+    },
+    getOptionsOnly: Boolean,
+    label: String,
+    title: String,
+    payload: [Object, Array, String, Number]
   },
 
   data() {
@@ -155,35 +164,64 @@ export default Vue.extend({
         return;
       }
       let options = this.downloadOptions;
+      let host = options.host;
+      if (!host && options.site) {
+        host = options.site.host;
+      }
 
-      let items = this.getSiteContentMenus(options.host);
+      if (!host) {
+        return;
+      }
+
+      this.site = options.site || this.getSiteFromHost(host);
+      let items = this.getSiteContentMenus(host);
       let menus: any[] = [];
-      this.site = options.site || this.getSiteFromHost(options.host);
 
       items.forEach((item: any) => {
         if (item.client && item.client.name) {
+          let title = this.$vuetify.breakpoint.xs
+            ? item.client.name
+            : this.$t("searchTorrent.downloadTo", {
+                path: `${item.client.name} -> ${item.client.address}`
+              });
+
+          if (item.path) {
+            title += ` ->${this.pathHandler.replacePathKey(
+              item.path,
+              this.site
+            )}`;
+          }
           menus.push({
-            title: this.$t("searchTorrent.downloadTo", {
-              path:
-                `${item.client.name} -> ${item.client.address}` +
-                (item.path
-                  ? ` -> ${this.pathHandler.replacePathKey(
-                      item.path,
-                      this.site
-                    )}`
-                  : "")
-            }).toString(),
+            title,
             fn: () => {
               if (options.url) {
                 console.log(options, item);
-                this.sendToClient({
+                const downloadOptions = {
                   url: options.url,
                   title: options.title,
                   savePath: item.path,
                   autoStart: item.client.autoStart,
                   link: options.link,
                   clientId: item.client.id
-                });
+                };
+
+                if (this.getOptionsOnly) {
+                  downloadOptions.savePath = this.pathHandler.getSavePath(
+                    downloadOptions.savePath,
+                    this.site
+                  );
+                  this.$emit("itemClick", {
+                    payload: this.payload,
+                    downloadOptions: Object.assign(
+                      {
+                        clientName: item.client.name
+                      },
+                      downloadOptions
+                    )
+                  });
+                  return;
+                }
+                this.sendToClient(downloadOptions);
               }
             }
           });

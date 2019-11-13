@@ -21,6 +21,7 @@ import { filters } from "@/service/filters";
 import { PathHandler } from "@/service/pathHandler";
 import i18n from "i18next";
 import { InfoParser } from "@/background/infoParser";
+import { PPF } from "@/service/public";
 
 /**
  * 插件背景脚本，会插入到每个页面
@@ -50,7 +51,9 @@ class PTPContent {
   private messageItems: Dictionary<any> = {};
 
   public buttonBar: JQuery = <any>null;
-  public droper: JQuery = $("<div style='display:none;' class='droper'/>");
+  public droper: JQuery = $(
+    "<div style='display:none;' class='pt-plugin-droper'/>"
+  );
   private buttons: any[] = [];
   private buttonBarHeight: number = 0;
   private logo: JQuery = <any>null;
@@ -399,7 +402,7 @@ class PTPContent {
       });
     }
     this.logo = $(
-      "<div class='logo' title='" + i18n.t("pluginTitle") + "'/>"
+      "<div class='pt-plugin-logo' title='" + i18n.t("pluginTitle") + "'/>"
     ).appendTo(this.buttonBar);
     this.logo.on("click", () => {
       this.call(EAction.openOptions);
@@ -432,8 +435,8 @@ class PTPContent {
         key: options.key
       })
       .data("line", line);
-    let inner = $("<div class='inner'/>").appendTo(button);
-    let loading = $("<div class='loading'/>").appendTo(button);
+    let inner = $("<div class='pt-plugin-button-inner'/>").appendTo(button);
+    let loading = $("<div class='pt-plugin-loading'/>").appendTo(button);
     let success = $("<div class='action-success'/>")
       .html('<div class="action-success-ani"></div>')
       .appendTo(button);
@@ -675,7 +678,7 @@ class PTPContent {
         //   };
         //   e.dataTransfer.setData("text/plain", JSON.stringify(data));
         // }
-        this.logo.addClass("onLoading");
+        this.logo.addClass("pt-plugin-onLoading");
         this.buttonBar.addClass("pt-plugin-body-over");
       },
       false
@@ -703,17 +706,17 @@ class PTPContent {
                   null,
                   `search-torrent/${IMDbMatch[1]}`
                 );
-                this.logo.removeClass("onLoading");
+                this.logo.removeClass("pt-plugin-onLoading");
                 return;
               }
               if (this.pageApp) {
                 this.pageApp
                   .call(EAction.downloadFromDroper, data)
                   .then(() => {
-                    this.logo.removeClass("onLoading");
+                    this.logo.removeClass("pt-plugin-onLoading");
                   })
                   .catch(() => {
-                    this.logo.removeClass("onLoading");
+                    this.logo.removeClass("pt-plugin-onLoading");
                   });
               } else {
                 this.showNotice({
@@ -721,14 +724,14 @@ class PTPContent {
                   msg: i18n.t("notSupported"), // "当前页面不支持此操作",
                   timeout: 3
                 });
-                this.logo.removeClass("onLoading");
+                this.logo.removeClass("pt-plugin-onLoading");
               }
             } else {
-              this.logo.removeClass("onLoading");
+              this.logo.removeClass("pt-plugin-onLoading");
             }
           }
         } catch (error) {
-          this.logo.removeClass("onLoading");
+          this.logo.removeClass("pt-plugin-onLoading");
         }
       },
       false
@@ -739,7 +742,7 @@ class PTPContent {
       e.stopPropagation();
       e.preventDefault();
       this.hideDroper();
-      this.logo.removeClass("onLoading");
+      this.logo.removeClass("pt-plugin-onLoading");
       this.buttonBar.removeClass("pt-plugin-body-over");
     });
   }
@@ -758,7 +761,9 @@ class PTPContent {
     if (!onDrop) {
       return;
     }
-    let droper: JQuery = $("<div style='display:none;' class='droper'/>");
+    let droper: JQuery = $(
+      "<div style='display:none;' class='pt-plugin-droper'/>"
+    );
 
     droper.appendTo(this.buttonBar);
     // 拖入接收对象时
@@ -810,11 +815,11 @@ class PTPContent {
   }
 
   private hideDroper() {
-    $(".droper").hide();
+    $(".pt-plugin-droper").hide();
   }
 
   private showDroper() {
-    $(".droper").show();
+    $(".pt-plugin-droper").show();
   }
 
   private initBrowserEvent() {
@@ -866,17 +871,20 @@ class PTPContent {
         this.call(EAction.getSiteSelectorConfig, {
           host: this.site.host,
           name: "common"
-        }).then(result => {
-          this.pageSelector = result;
-        });
+        })
+          .then(result => {
+            this.pageSelector = result;
+          })
+          .catch(() => {
+            // 没有选择器
+          });
       });
   }
 
   /**
-   * 从当前行中获取指定字段的值
-   * @param site 当前站点
-   * @param row 当前行
+   * 从当前页面或指定DOM中获取指定字段的内容
    * @param fieldName 字段名称
+   * @param content 指定的父元素，默认为 body
    * @return null 表示没有获取到内容
    */
   public getFieldValue(fieldName: string = "", content: any = $("body")) {
@@ -898,5 +906,6 @@ class PTPContent {
 
 // 暴露到 window 对象
 Object.assign(window, {
-  PTService: new PTPContent()
+  PTService: new PTPContent(),
+  PPF
 });

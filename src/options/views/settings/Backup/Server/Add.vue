@@ -19,7 +19,7 @@
         </v-toolbar>
 
         <v-card-text class="body">
-          <Editor :initData="selected" @change="change" />
+          <Editor :type="type" :initData="selected" @change="change" :show="show" />
         </v-card-text>
 
         <v-divider></v-divider>
@@ -56,7 +56,11 @@ export default Vue.extend({
     };
   },
   props: {
-    value: Boolean
+    value: Boolean,
+    type: {
+      type: String,
+      default: EBackupServerType.OWSS
+    }
   },
   model: {
     prop: "value",
@@ -77,7 +81,7 @@ export default Vue.extend({
     save() {
       this.$emit(
         "save",
-        Object.assign({ type: EBackupServerType.OWSS }, this.newData)
+        Object.assign({ type: EBackupServerType.WebDAV }, this.newData)
       );
       this.show = false;
     },

@@ -6,7 +6,6 @@ import {
   Site,
   SiteSchema,
   Dictionary,
-  EDownloadClientType,
   DataResult,
   EPaginationKey,
   EModule,
@@ -22,7 +21,9 @@ import {
   ECommonKey,
   ERequestMethod,
   ISearchPayload,
-  ICollection
+  EResourceOrderMode,
+  ICollectionGroup,
+  EViewKey
 } from "@/interface/common";
 import { filters } from "@/service/filters";
 import dayjs from "dayjs";
@@ -31,7 +32,10 @@ import * as basicContext from "basiccontext";
 import { PathHandler } from "@/service/pathHandler";
 import MovieInfoCard from "@/options/components/MovieInfoCard.vue";
 import TorrentProgress from "@/options/components/TorrentProgress.vue";
+import AddToCollectionGroup from "./AddToCollectionGroup.vue";
+import Actions from "./Actions.vue";
 import { PPF } from "@/service/public";
+import KeepUpload from "./KeepUpload.vue";
 
 type searchResult = {
   sites: Dictionary<any>;
@@ -46,7 +50,10 @@ const extension = new Extension();
 export default Vue.extend({
   components: {
     MovieInfoCard,
-    TorrentProgress
+    TorrentProgress,
+    Actions,
+    AddToCollectionGroup,
+    KeepUpload
   },
   data() {
     return {
@@ -117,7 +124,13 @@ export default Vue.extend({
       lastCheckedIndex: -1,
       shiftKey: false,
       searchPayload: {} as ISearchPayload,
-      torrentCollectionLinks: [] as string[]
+      torrentCollectionLinks: [] as string[],
+      headerOrderClickCount: 0,
+
+      currentOrderMode: EResourceOrderMode.asc,
+      rawDatas: [] as any[],
+      toolbarClass: "mt-3",
+      toolbarIsFixed: false
     };
   },
   created() {
@@ -133,6 +146,13 @@ export default Vue.extend({
         rowsPerPage: 100
       }
     );
+
+    let viewOptions = this.$store.getters.viewsOptions(EViewKey.searchTorrent, {
+      checkBox: false,
+      showCategory: false
+    });
+    Object.assign(this, viewOptions);
+
     this.loadTorrentCollections();
   },
   mounted() {
@@ -148,6 +168,10 @@ export default Vue.extend({
     $(".search-torrent").on(upEvent, e => {
       this.shiftKey = false;
     });
+    window.addEventListener("scroll", this.handleScroll);
+  },
+  destroyed() {
+    window.removeEventListener("scroll", this.handleScroll);
   },
   beforeRouteUpdate(to: Route, from: Route, next: any) {
     if (!to.params.key) {
@@ -169,6 +193,7 @@ export default Vue.extend({
 
     this.host = this.$route.params["host"];
     this.loadTorrentCollections();
+    this.handleScroll();
   },
   watch: {
     key() {
@@ -189,6 +214,26 @@ export default Vue.extend({
     },
     loading() {
       this.$store.commit("updateSearchStatus", this.loading);
+    },
+    pagination: {
+      handler() {
+        if (this.pagination.descending) {
+          this.currentOrderMode = EResourceOrderMode.desc;
+        } else {
+          this.currentOrderMode = EResourceOrderMode.asc;
+        }
+        this.updatePagination(this.pagination);
+      },
+      deep: true
+    },
+    currentOrderMode() {
+      this.pagination.descending =
+        this.currentOrderMode === EResourceOrderMode.desc;
+    },
+    checkBox() {
+      if (this.checkBox === false) {
+        this.selected = [];
+      }
     }
   },
   methods: {
@@ -221,6 +266,7 @@ export default Vue.extend({
       this.selected = [];
       this.clearMessage();
       this.datas = [];
+      this.rawDatas = [];
       this.getLinks = [];
       this.searchResult = {
         sites: {},
@@ -239,16 +285,16 @@ export default Vue.extend({
       if (this.loading || !this.key) return;
 
       this.reset();
-      if (window.location.hostname == "localhost") {
-        $.getJSON("http://localhost:8001/test/searchData.json").done(
-          (result: any) => {
-            if (result) {
-              this.addSearchResult(result);
-              // this.datas = result;
-            }
-            // console.log(result);
+      if (window.location.protocol === "http:") {
+        $.getJSON(
+          `http://${window.location.hostname}:8001/test/searchData.json`
+        ).done((result: any) => {
+          if (result) {
+            this.addSearchResult(result);
+            // this.datas = result;
           }
-        );
+          // console.log(result);
+        });
         return;
       }
 
@@ -273,6 +319,15 @@ export default Vue.extend({
       if (!this.options.sites) {
         this.errorMsg = this.$t("searchTorrent.sitesIsMissing").toString();
         return;
+      }
+
+      // 显示搜索快照
+      if (/(show-snapshot)-([a-z0-9]{32})/.test(this.key)) {
+        let match = this.key.match(/(show-snapshot)-([a-z0-9]{32})/);
+        if (match) {
+          this.loadSearchResultSnapshot(match[2]);
+          return;
+        }
       }
 
       if (searchPayload) {
@@ -328,7 +383,16 @@ export default Vue.extend({
             }
           })
           .catch(error => {
-            this.errorMsg = error;
+            if (searchKeys.cn) {
+              this.key = searchKeys.cn;
+              this.search(this.searchPayload);
+            } else {
+              this.errorMsg =
+                error ||
+                this.$t("searchTorrent.doubanIdConversionFailed").toString();
+              this.searchMsg = this.errorMsg;
+              this.loading = false;
+            }
           });
         return;
       }
@@ -349,6 +413,9 @@ export default Vue.extend({
       // 指定搜索方案id
       if (/^[a-z0-9]{32}$/.test(this.host)) {
         searchSolutionId = this.host;
+        this.host = "";
+      } else if (this.host === "all") {
+        searchSolutionId = "all";
         this.host = "";
       }
 
@@ -414,10 +481,7 @@ export default Vue.extend({
         this.options.sites.forEach((item: Site) => {
           if (item.offline) return false;
 
-          if (
-            item.allowSearch ||
-            this.options.defaultSearchSolutionId == "all"
-          ) {
+          if (item.allowSearch || searchSolutionId == "all") {
             let siteSchema: SiteSchema = this.getSiteSchema(item);
             if (
               siteSchema &&
@@ -497,7 +561,7 @@ export default Vue.extend({
           }
         });
 
-        this.sendSearchRequest(site);
+        this.sendSearchRequest(PPF.clone(site));
       });
     },
 
@@ -658,6 +722,56 @@ export default Vue.extend({
       }
     },
     /**
+     * 创建搜索结果快照
+     */
+    createSearchResultSnapshot() {
+      extension
+        .sendRequest(EAction.createSearchResultSnapshot, null, {
+          key: this.key,
+          searchPayload: this.searchPayload,
+          result: this.rawDatas
+        })
+        .then(result => {
+          this.successMsg = this.$t(
+            "searchResultSnapshot.createSuccess"
+          ).toString();
+          console.log("createSearchResultSnapshot", result);
+        })
+        .catch(() => {
+          this.errorMsg = this.$t(
+            "searchResultSnapshot.createError"
+          ).toString();
+        });
+    },
+    /**
+     * 加载搜索结果快照
+     * @param id 快照ID
+     */
+    loadSearchResultSnapshot(id: string) {
+      this.loading = true;
+      extension
+        .sendRequest(EAction.getSearchResultSnapshot, null, id)
+        .then(data => {
+          console.log("loadSearchResultSnapshot", data);
+          this.key = data.key;
+          this.searchPayload = data.searchPayload;
+          if (this.searchPayload && this.searchPayload.imdbId) {
+            this.IMDbId = this.searchPayload.imdbId;
+          } else if (/^(tt\d+)$/.test(this.key)) {
+            this.IMDbId = this.key;
+          } else {
+            this.IMDbId = "";
+          }
+          this.addSearchResult(PPF.clone(data.result));
+          this.searchMsg = this.$t("searchResultSnapshot.snapshotTime", {
+            time: dayjs(data.time).format("YYYY-MM-DD hh:mm:ss")
+          }).toString();
+          setTimeout(() => {
+            this.loading = false;
+          }, 300);
+        });
+    },
+    /**
      * 添加搜索结果，并组织字段格式
      */
     addSearchResult(result: any[]) {
@@ -668,8 +782,21 @@ export default Vue.extend({
       }
 
       result.forEach((item: SearchResultItem) => {
+        let _item = PPF.clone(item);
+        if (_item.site) {
+          _item.host = _item.site.host;
+          delete _item.site;
+        }
+        this.rawDatas.push(_item);
+
+        // 将 // 替换为 /
+        item.link = (item.link as string)
+          .replace("://", "****")
+          .replace(/\/\//g, "/")
+          .replace("****", "://");
+
         // 忽略重复的搜索结果
-        if (this.getLinks.indexOf(item.link) !== -1) {
+        if (this.getLinks.includes(item.link)) {
           // 跳过本次循环进行下一个元素
           return;
         }
@@ -724,12 +851,6 @@ export default Vue.extend({
           }
         }
 
-        // 将 // 替换为 /
-        item.link = (item.link as string)
-          .replace("://", "****")
-          .replace(/\/\//g, "/")
-          .replace("****", "://");
-
         if (item.url) {
           item.url = item.url
             .replace("://", "****")
@@ -743,6 +864,11 @@ export default Vue.extend({
         this.searchMsg = this.$t("searchTorrent.searchProgress", {
           count: this.datas.length
         }).toString();
+
+        if (!item.site) {
+          let host = item.host || "";
+          item.site = PPF.getSiteFromHost(host, this.options);
+        }
 
         let siteName = item.site.name;
         if (!this.searchResult.sites[siteName]) {
@@ -827,9 +953,10 @@ export default Vue.extend({
       if (typeof size == "number") {
         return size;
       }
-      let _size_raw_match = size.match(
-        /^(\d*\.?\d+)(.*[^ZEPTGMK])?([ZEPTGMK](B|iB))$/i
-      );
+      let _size_raw_match = size
+        .replace(/,/g, "")
+        .trim()
+        .match(/^(\d*\.?\d+)(.*[^ZEPTGMK])?([ZEPTGMK](B|iB))$/i);
       if (_size_raw_match) {
         let _size_num = parseFloat(_size_raw_match[1]);
         let _size_type = _size_raw_match[3];
@@ -1186,14 +1313,18 @@ export default Vue.extend({
           ).toString();
         });
     },
-    /**
-     * 复制下载链接到剪切板
-     */
-    copySelectedToClipboard() {
+    getSelectedURLs() {
       let urls: string[] = [];
       this.selected.forEach((item: SearchResultItem) => {
         item.url && urls.push(item.url);
       });
+      return urls;
+    },
+    /**
+     * 复制下载链接到剪切板
+     */
+    copySelectedToClipboard() {
+      let urls: string[] = this.getSelectedURLs();
       this.clearMessage();
       extension
         .sendRequest(EAction.copyTextToClipboard, null, urls.join("\n"))
@@ -1351,11 +1482,14 @@ export default Vue.extend({
       let _this = this;
 
       function addMenu(item: any) {
-        let title = _this
-          .$t("searchTorrent.downloadTo", {
-            path: `${item.client.name} -> ${item.client.address}`
-          })
-          .toString();
+        let title = _this.$vuetify.breakpoint.xs
+          ? item.client.name
+          : _this
+              .$t("searchTorrent.downloadTo", {
+                path: `${item.client.name} -> ${item.client.address}`
+              })
+              .toString();
+
         if (item.path) {
           title += ` -> ${item.path}`;
         }
@@ -1522,7 +1656,9 @@ export default Vue.extend({
         datas = datas.sort(
           this.arrayObjectSort(
             this.pagination.sortBy,
-            this.pagination.descending ? "desc" : "abs"
+            this.pagination.descending
+              ? EResourceOrderMode.desc
+              : EResourceOrderMode.asc
           )
         );
 
@@ -1550,7 +1686,10 @@ export default Vue.extend({
      * @param field 字段
      * @param sortOrder 排序方式
      */
-    arrayObjectSort(field: string, sortOrder: string = "") {
+    arrayObjectSort(
+      field: string,
+      sortOrder: EResourceOrderMode = EResourceOrderMode.asc
+    ) {
       // 深层获取对象指定的属性值
       function getObjectValue(obj: any, path: string) {
         return new Function("o", "return o." + path)(obj);
@@ -1559,11 +1698,11 @@ export default Vue.extend({
         var value1 = getObjectValue(object1, field);
         var value2 = getObjectValue(object2, field);
         if (value1 < value2) {
-          if (sortOrder == "desc") {
+          if (sortOrder == EResourceOrderMode.desc) {
             return 1;
           } else return -1;
         } else if (value1 > value2) {
-          if (sortOrder == "desc") {
+          if (sortOrder == EResourceOrderMode.desc) {
             return -1;
           } else return 1;
         } else {
@@ -1571,19 +1710,38 @@ export default Vue.extend({
         }
       };
     },
-    addToCollection(item: any) {
+    addSelectedToCollection(group: ICollectionGroup) {
+      this.selected.forEach((item: SearchResultItem) => {
+        if (item.url) {
+          this.addToCollection(item, group);
+        }
+      });
+    },
+    /**
+     * 添加到收藏
+     * @param item 当前种子相关信息
+     * @param group 收藏分组信息
+     */
+    addToCollection(item: any, group?: ICollectionGroup) {
+      let options: any = {
+        title: item.title,
+        url: item.url,
+        link: item.link,
+        host: item.site.host,
+        size: item.size,
+        subTitle: item.subTitle,
+        movieInfo: {
+          imdbId: this.IMDbId || this.searchPayload.imdbId,
+          doubanId: this.searchPayload.doubanId
+        }
+      };
+
+      if (group && group.id) {
+        options.groups = [group.id];
+      }
+
       extension
-        .sendRequest(EAction.addTorrentToCollection, null, {
-          title: item.title,
-          url: item.url,
-          link: item.link,
-          host: item.site.host,
-          size: item.size,
-          subTitle: item.subTitle,
-          movieInfo: {
-            imdbId: this.IMDbId
-          }
-        })
+        .sendRequest(EAction.addTorrentToCollection, null, options)
         .then(result => {
           this.loadTorrentCollections();
           console.log(result);
@@ -1592,7 +1750,7 @@ export default Vue.extend({
     deleteCollection(item: any) {
       extension
         .sendRequest(EAction.deleteTorrentFromCollention, null, {
-          link: item.link
+          link: PPF.getCleaningURL(item.link)
         })
         .then(result => {
           this.loadTorrentCollections();
@@ -1607,6 +1765,93 @@ export default Vue.extend({
     },
     isCollectioned(link: string): boolean {
       return this.torrentCollectionLinks.includes(PPF.getCleaningURL(link));
+    },
+    toggleAll() {
+      if (this.selected.length) this.selected = [];
+      else this.selected = this.datas.slice();
+    },
+    changeSort(column: string) {
+      if (this.pagination.sortBy === column) {
+        this.pagination.descending = !this.pagination.descending;
+        this.headerOrderClickCount++;
+        if (this.headerOrderClickCount == 2) {
+          this.pagination.sortBy = "";
+        }
+      } else {
+        this.headerOrderClickCount = 0;
+        this.pagination.sortBy = column;
+        this.pagination.descending = false;
+      }
+    },
+    getHeaderClass(header: any) {
+      let result: string[] = [];
+      result.push("column");
+
+      if (header.sortable !== false) {
+        result.push("sortable");
+
+        result.push(this.pagination.descending ? "desc" : "asc");
+        if (header.value === this.pagination.sortBy) {
+          result.push("active");
+        }
+      }
+
+      if (header.align) {
+        result.push(`text-xs-${header.align}`);
+      }
+
+      return result;
+    },
+
+    downloadSuccess(msg: string) {
+      this.successMsg = msg;
+    },
+
+    downloadError(msg: string) {
+      this.errorMsg = msg;
+    },
+
+    updateViewOptions() {
+      this.$store.dispatch("updateViewOptions", {
+        key: EViewKey.searchTorrent,
+        options: {
+          checkBox: this.checkBox,
+          showCategory: this.showCategory
+        }
+      });
+    },
+    handleScroll() {
+      const divToolbar: any = $("#divToolbar");
+      if (!divToolbar || !divToolbar.offset()) {
+        return;
+      }
+      const sysTopBar: any = $("#system-topbar");
+      const top = sysTopBar.height();
+      const scrollTop =
+        window.pageYOffset ||
+        document.documentElement.scrollTop ||
+        document.body.scrollTop;
+      const offsetTop = divToolbar.offset().top;
+      if (scrollTop + top > offsetTop) {
+        this.toolbarClass = "isFixedToolbar";
+        this.toolbarIsFixed = true;
+        const height = $("#divToobarInner").height() || 0;
+        $("#divToobarHeight").height(height);
+        $("#divToobarInner").css({
+          top: top
+        });
+      } else {
+        this.toolbarIsFixed = false;
+        this.toolbarClass = "mt-3";
+      }
+    },
+    changeSelectAllStatus() {
+      // 如有已有部分选中，则取消所有已选择的内容
+      if (this.selected.length > 0) {
+        this.selected = [];
+      } else {
+        this.selected = this.datas;
+      }
     }
   },
   computed: {
@@ -1618,57 +1863,90 @@ export default Vue.extend({
           value: this.$store.state.options.searchResultOrderBySitePriority
             ? "site.priority"
             : "site.host",
-          width: "100px"
+          visible: this.$vuetify.breakpoint.mdAndUp
         },
         {
           text: this.$t("searchTorrent.headers.title"),
           align: "left",
-          value: "title"
+          value: "title",
+          visible: true
         },
         {
           text: this.$t("searchTorrent.headers.category"),
           align: "center",
           value: "category.name",
-          width: "150px"
+          width: "150px",
+          visible: this.$vuetify.breakpoint.width > 1200
         },
         {
           text: this.$t("searchTorrent.headers.size"),
           align: "right",
           value: "size",
-          width: "100px"
+          width: "100px",
+          visible: this.$vuetify.breakpoint.smAndUp
         },
-        // { text: "评论", align: "center", value: "comments" },
         {
           text: this.$t("searchTorrent.headers.seeders"),
           align: "right",
           value: "seeders",
-          width: "60px"
+          width: "60px",
+          visible: this.$vuetify.breakpoint.smAndUp
         },
         {
           text: this.$t("searchTorrent.headers.leechers"),
           align: "right",
           value: "leechers",
-          width: "60px"
+          width: "60px",
+          visible: this.$vuetify.breakpoint.mdAndUp
         },
         {
           text: this.$t("searchTorrent.headers.completed"),
           align: "right",
           value: "completed",
-          width: "60px"
+          width: "60px",
+          visible: this.$vuetify.breakpoint.mdAndUp
         },
-        // { text: "发布者", align: "left", value: "author" },
         {
           text: this.$t("searchTorrent.headers.time"),
           align: "left",
           value: "time",
-          width: "130px"
+          width: "130px",
+          visible: this.$vuetify.breakpoint.mdAndUp
         },
         {
           text: this.$t("searchTorrent.headers.action"),
           sortable: false,
-          width: "130px"
+          width: this.$vuetify.breakpoint.mdAndUp ? "130px" : "80px",
+          align: "center",
+          visible: this.$vuetify.breakpoint.smAndUp
         }
       ];
+    },
+    orderHeaders(): Array<any> {
+      return this.headers.filter(item => {
+        return item.sortable !== false;
+      });
+    },
+    orderMode(): Array<any> {
+      return [
+        {
+          text: this.$t("common.orderMode.asc"),
+          value: EResourceOrderMode.asc
+        },
+        {
+          text: this.$t("common.orderMode.desc"),
+          value: EResourceOrderMode.desc
+        }
+      ];
+    },
+    indeterminate(): boolean {
+      if (
+        this.selected.length > 0 &&
+        this.selected.length < this.datas.length
+      ) {
+        return true;
+      }
+      return false;
     }
   }
 });

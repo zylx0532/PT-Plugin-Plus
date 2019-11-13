@@ -266,13 +266,15 @@ export class User {
 
       let requestData = rule.requestData;
       if (requestData && userInfo) {
-        for (const key in requestData) {
-          if (requestData.hasOwnProperty(key)) {
-            const value = requestData[key];
-            requestData[key] = value
-              .replace("$user.id$", userInfo.id)
-              .replace("$user.name$", userInfo.name);
+        try {
+          for (const key in requestData) {
+            if (requestData.hasOwnProperty(key)) {
+              const value = requestData[key];
+              requestData[key] = PPF.replaceKeys(value, userInfo, "user");
+            }
           }
+        } catch (error) {
+          console.log(error);
         }
       }
 
@@ -304,7 +306,8 @@ export class User {
             if (rule.dataType !== ERequestResultType.JSON) {
               let doc = new DOMParser().parseFromString(result, "text/html");
               // 构造 jQuery 对象
-              content = $(doc).find("body");
+              let topElement = rule.topElement || "body";
+              content = $(doc).find(topElement);
             } else {
               content = JSON.parse(result);
             }

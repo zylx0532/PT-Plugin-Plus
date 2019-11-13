@@ -2,7 +2,20 @@ interface IFilter {
   formatNumber: (source: number, format?: string) => string;
   formatSize: (bytes: any, zeroToEmpty?: boolean, type?: string) => string;
   formatSpeed: (bytes: any, zeroToEmpty: boolean) => string;
-  parseURL: (url: string) => any;
+  parseURL: (
+    url: string
+  ) => {
+    source: string;
+    protocol: string;
+    host: string;
+    port?: number;
+    query?: string;
+    params?: string[];
+    hash?: string;
+    path: string;
+    segments: string;
+    origin: string;
+  };
   timeAgoToNumber: (source: string) => number;
   [key: string]: any;
 }
@@ -17,6 +30,10 @@ export const filters: IFilter = {
    * @param format 格式化格式
    */
   formatNumber(source: number, format: string = "###,###,###,###.00"): string {
+    if (source === undefined) {
+      return "";
+    }
+
     const fStr = (sNumber: string, fmt?: any, p?: any) => {
       if (sNumber === "" || sNumber === undefined) {
         if (fmt === "" || fmt === undefined) {
@@ -238,7 +255,8 @@ export const filters: IFilter = {
       })(),
       hash: a.hash.replace("#", ""),
       path: a.pathname.replace(/^([^/])/, "/$1"),
-      segments: a.pathname.replace(/^\//, "").split("/")
+      segments: a.pathname.replace(/^\//, "").split("/"),
+      origin: `${a.protocol}//${a.hostname}` + (a.port ? `:${a.port}` : "")
     };
   },
 
@@ -247,8 +265,15 @@ export const filters: IFilter = {
    * @param source
    */
   timeAgoToNumber(source: string): number {
-    // 有部分站点连 ago 都没有
-    let rule = /^([\d.]+).+?((year|month|week|day|hour|min|minute)s?)( +ago)?$/i;
+    /**
+     * 可以匹配以下情况：
+     * 1 year
+     * 1 year ago
+     * 2 yesrs ago
+     * 2.1 months ago
+     * 2.1 months ago by xxx
+     */
+    let rule = /^([\d.]+).+?((year|month|week|day|hour|min|minute)s?)( +ago)?(.+)?$/i;
 
     let matchs = source.trim().match(rule);
     if (!matchs) {

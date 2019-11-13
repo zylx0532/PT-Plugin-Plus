@@ -28,6 +28,7 @@ import { APP } from "@/service/api";
 import URLParse from "url-parse";
 import { User } from "./user";
 import { MovieInfoService } from "@/service/movieInfoService";
+import parseTorrent from "parse-torrent";
 
 type Service = PTPlugin;
 export default class Controller {
@@ -54,6 +55,8 @@ export default class Controller {
   private imageBase64Cache: Dictionary<any> = {};
   // 下载重试次数
   private downloadFailedRetriesCache: Dictionary<any> = {};
+  // 种子链接对应的名称缓存
+  private torrentInfosCache: Dictionary<any> = {};
 
   constructor(public service: Service) {}
 
@@ -199,7 +202,7 @@ export default class Controller {
       let host = URL.host;
       let site = this.getSiteFromHost(host);
       // 重新指定host内容，因为站点可能定义了多域名
-      host = site.host;
+      host = site.host + "";
       let siteDefaultPath = this.getSiteDefaultPath(site);
       let siteClientConfig = this.siteDefaultClients[host];
       if (siteDefaultPath) {
@@ -260,6 +263,14 @@ export default class Controller {
             }), // `下载服务器${clientConfig.options.name}处理[${ EAction.addTorrentFromURL}]命令完成`,
             data: result
           });
+
+          // 如果未指定标题，则尝试从种子信息缓存中获取名称
+          if (
+            !downloadOptions.title &&
+            this.torrentInfosCache[downloadOptions.url]
+          ) {
+            downloadOptions.title = this.torrentInfosCache[downloadOptions.url];
+          }
 
           if (result && (result.code === 0 || result.success === false)) {
             if (
@@ -853,10 +864,20 @@ export default class Controller {
 
   /**
    * 从指定的链接获取种子文件内容
-   * @param url
+   * @param options
    */
-  public getTorrentDataFromURL(url: string): Promise<any> {
+  public getTorrentDataFromURL(options: string | any): Promise<any> {
     return new Promise<any>((resolve?: any, reject?: any) => {
+      let url = "";
+      if (typeof options === "string") {
+        url = options;
+        options = {
+          url,
+          parseTorrent: false
+        };
+      } else {
+        url = options.url;
+      }
       let site = this.getSiteOptionsFromURL(url);
       let requestMethod = ERequestMethod.GET;
       if (site) {
@@ -875,7 +896,32 @@ export default class Controller {
           file.content &&
           /octet-stream|x-bittorrent/gi.test(file.content.type)
         ) {
-          resolve(file.content);
+          parseTorrent.remote(file.content, (err, torrent) => {
+            if (err) {
+              console.log("parse.error", err);
+              // 是否解析种子文件
+              if (options.parseTorrent) {
+                reject(err);
+              } else {
+                resolve(file.content);
+              }
+            } else {
+              // 缓存种子文件名称
+              if (torrent) {
+                this.torrentInfosCache[url] = torrent.name;
+              }
+
+              // 是否解析种子文件
+              if (options.parseTorrent) {
+                resolve({
+                  url,
+                  torrent
+                });
+              } else {
+                resolve(file.content);
+              }
+            }
+          });
         } else {
           // "无效的种子文件"
           reject(
@@ -1044,7 +1090,7 @@ export default class Controller {
    * 根据指定的 doubanId 获取 IMDbId
    * @param doubanId
    */
-  public getIMDbIdFromDouban(doubanId: number): Promise<any> {
+  public getIMDbIdFromDouban(doubanId: string): Promise<any> {
     return this.movieInfoService.getIMDbIdFromDouban(doubanId);
   }
 
@@ -1246,5 +1292,70 @@ export default class Controller {
 
   public restoreCookies(data: any): Promise<any> {
     return this.service.config.restoreCookies(data);
+  }
+
+  public resetFavicons(): Promise<any> {
+    this.service.config.favicon.clear();
+    return this.service.config.getFavicons();
+  }
+
+  public getBackupRawData(): Promise<any> {
+    return this.service.config.getBackupRawData();
+  }
+
+  public testBackupServerConnectivity(options: any): Promise<any> {
+    return this.service.config.testBackupServerConnectivity(options);
+  }
+
+  public createSearchResultSnapshot(options: any): Promise<any> {
+    return this.service.searchResultSnapshot.add(options);
+  }
+
+  public getSearchResultSnapshot(id: string): Promise<any> {
+    return this.service.searchResultSnapshot.get(id);
+  }
+
+  public loadSearchResultSnapshot(): Promise<any> {
+    return this.service.searchResultSnapshot.load();
+  }
+
+  public removeSearchResultSnapshot(options: any): Promise<any> {
+    return this.service.searchResultSnapshot.remove(options);
+  }
+
+  public clearSearchResultSnapshot(): Promise<any> {
+    return this.service.searchResultSnapshot.clear();
+  }
+
+  public resetSearchResultSnapshot(datas: any): Promise<any> {
+    return this.service.searchResultSnapshot.reset(datas);
+  }
+
+  public createKeepUploadTask(options: any): Promise<any> {
+    return this.service.keepUploadTask.add(options);
+  }
+
+  public getKeepUploadTask(id: string): Promise<any> {
+    return this.service.keepUploadTask.get(id);
+  }
+
+  public loadKeepUploadTask(): Promise<any> {
+    return this.service.keepUploadTask.load();
+  }
+
+  public removeKeepUploadTask(options: any): Promise<any> {
+    return this.service.keepUploadTask.remove(options);
+  }
+
+  public clearKeepUploadTask(): Promise<any> {
+    return this.service.keepUploadTask.clear();
+  }
+
+  public resetKeepUploadTask(datas: any): Promise<any> {
+    return this.service.keepUploadTask.reset(datas);
+  }
+
+  public updateKeepUploadTask(options: any): Promise<any> {
+    return this.service.keepUploadTask.update(options);
   }
 }

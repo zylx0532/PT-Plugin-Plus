@@ -69,6 +69,8 @@
         </div>
       </v-card-actions>
 
+      <WorkingStatus ref="workingStatus" />
+
       <v-data-table
         v-model="selected"
         :headers="headers"
@@ -96,6 +98,7 @@
               :loading="props.item.backingup"
               color="success"
               class="mx-0"
+              :title="$t('settings.backup.server.list.backupToServer')"
             >
               <v-icon small>backup</v-icon>
             </v-btn>
@@ -107,10 +110,19 @@
               :loading="props.item.loading"
               color="info"
               class="mx-0"
+              :title="$t('settings.backup.server.list.loadBackupList')"
             >
               <v-icon small>restore</v-icon>
             </v-btn>
-            <v-btn flat icon small @click="editBackupServer(props.item)" color="grey" class="mx-0">
+            <v-btn
+              flat
+              icon
+              small
+              @click="editBackupServer(props.item)"
+              color="grey"
+              class="mx-0"
+              :title="$t('common.edit')"
+            >
               <v-icon small>edit</v-icon>
             </v-btn>
             <v-btn
@@ -121,6 +133,7 @@
               :loading="props.item.deleting"
               color="error"
               class="mx-0"
+              :title="$t('common.remove')"
             >
               <v-icon small>delete</v-icon>
             </v-btn>
@@ -128,7 +141,7 @@
         </template>
         <template slot="expand" slot-scope="props">
           <div class="px-5">
-            <OWSSList
+            <ServerList
               :items="props.item.dataList"
               :server="props.item"
               :loading="props.item.loading"
@@ -144,10 +157,15 @@
     <v-snackbar v-model="haveError" top :timeout="3000" color="error">{{ errorMsg }}</v-snackbar>
     <v-snackbar v-model="haveSuccess" bottom :timeout="3000" color="success">{{ successMsg }}</v-snackbar>
 
-    <!-- 新增 -->
-    <AddOWSS v-model="showAddOWSS" @save="addBackupServer" />
-    <!-- 新增 -->
-    <EditOWSS v-model="showEditOWSS" :initData="selectedItem" @save="updateBackupServer" />
+    <!-- 新增备份服务器 -->
+    <ServerAdd v-model="showServerAdd" :type="currentServerType" @save="addBackupServer" />
+    <!-- 编辑备份服务器 -->
+    <ServerEdit
+      v-model="showServerEdit"
+      :type="currentServerType"
+      :initData="selectedItem"
+      @save="updateBackupServer"
+    />
   </div>
 </template>
 <script lang="ts">
@@ -160,14 +178,21 @@ import {
   Options,
   IBackupServer,
   EBackupServerType,
-  ERestoreContent
+  ERestoreContent,
+  EBrowserType,
+  IWorkingStatusItem,
+  EWorkingStatus,
+  Site
 } from "@/interface/common";
 import { PPF } from "@/service/public";
 import { FileDownloader } from "@/service/downloader";
-import AddOWSS from "./OWSS/Add.vue";
-import EditOWSS from "./OWSS/Edit.vue";
-import OWSSList from "./OWSS/List.vue";
+
+import ServerAdd from "./Server/Add.vue";
+import ServerEdit from "./Server/Edit.vue";
+import ServerList from "./Server/List.vue";
+
 import { BackupFileParser } from "@/service/backupFileParser";
+import WorkingStatus from "@/options/components/WorkingStatus.vue";
 
 interface IBackupServerPro extends IBackupServer {
   loading?: boolean;
@@ -180,24 +205,12 @@ interface IBackupServerPro extends IBackupServer {
 const extension = new Extension();
 const backupFileParser = new BackupFileParser();
 
-interface IHashData {
-  hash: string;
-  keyMap: number[];
-  length: number;
-}
-
-interface IManifest {
-  checkInfo: IHashData;
-  version: string;
-  time: number;
-  hash?: string;
-}
-
 export default Vue.extend({
   components: {
-    AddOWSS,
-    EditOWSS,
-    OWSSList
+    WorkingStatus,
+    ServerAdd,
+    ServerEdit,
+    ServerList
   },
   data() {
     return {
@@ -218,20 +231,26 @@ export default Vue.extend({
         rowsPerPage: -1
       },
       selected: [] as any,
-      showAddOWSS: false,
-      showEditOWSS: false,
+      showServerAdd: false,
+      showServerEdit: false,
+      currentServerType: EBackupServerType.OWSS,
       servers: [] as any,
       selectedItem: {} as IBackupServer,
       backupServerTypes: [
         {
-          type: "OWSS"
+          type: EBackupServerType.OWSS
+        },
+        {
+          type: EBackupServerType.WebDAV
         }
-      ]
+      ],
+      workingStatus: null as any
     };
   },
   mounted() {
     this.fileInput = this.$refs.fileRestore;
     this.fileInput.addEventListener("change", this.restoreFile);
+    this.workingStatus = this.$refs.workingStatus;
   },
   beforeDestroy() {
     this.fileInput.removeEventListener("change", this.restoreFile);
@@ -249,6 +268,9 @@ export default Vue.extend({
     this.initBackupServers();
   },
   methods: {
+    t(key: string): string {
+      return this.$t(key).toString();
+    },
     /**
      * 初始化备份服务器列表
      */
@@ -306,6 +328,7 @@ export default Vue.extend({
         let file = restoreFile.files[0];
         if (file.name.substr(-4) === ".zip") {
           this.restoreFromZipFile(file);
+          restoreFile.value = "";
           return;
         }
         var r = new FileReader();
@@ -425,23 +448,61 @@ export default Vue.extend({
      * 创建备份文件
      */
     createBackupFile() {
-      extension.sendRequest(EAction.createBackupFile).catch(error => {
-        console.log(error);
-        this.errorMsg = this.$t("settings.backup.backupError").toString();
-      });
+      switch (PPF.browserName) {
+        case EBrowserType.Firefox:
+          extension
+            .sendRequest(EAction.getBackupRawData)
+            .then(result => {
+              backupFileParser
+                .createBackupFileBlob(result)
+                .then((blob: any) => {
+                  FileSaver.saveAs(blob, PPF.getNewBackupFileName());
+                });
+              console.log(result);
+            })
+            .catch(error => {
+              console.log(error);
+              this.errorMsg = this.$t("settings.backup.backupError").toString();
+            });
+          break;
+
+        default:
+          extension
+            .sendRequest(EAction.createBackupFile)
+            .then(result => {
+              console.log(result);
+            })
+            .catch(error => {
+              console.log(error);
+              this.errorMsg = this.$t("settings.backup.backupError").toString();
+            });
+          break;
+      }
     },
     /**
      * 从 zip 文件中恢复配置信息
      */
     restoreFromZipFile(file: any) {
       backupFileParser
-        .loadZipData(file)
+        .loadZipData(
+          file,
+          this.$t("settings.backup.enterSecretKey").toString(),
+          this.$store.state.options.encryptSecretKey
+        )
         .then(result => {
           console.log(result);
           this.restoreConfirm(result);
         })
         .catch(error => {
           console.log(error);
+          if (typeof error === "string") {
+            if (this.$te(`settings.backup.restoreErrorType.${error}`)) {
+              this.errorMsg = this.$t(
+                `settings.backup.restoreErrorType.${error}`
+              ).toString();
+              return;
+            }
+          }
           this.errorMsg = this.$t("settings.backup.restoreError").toString();
         });
     },
@@ -452,15 +513,57 @@ export default Vue.extend({
       infos: any,
       restoreContent: ERestoreContent = ERestoreContent.all
     ) {
+      // 如果指定了恢复内容，检测要恢复的内容是否存在
+      switch (restoreContent) {
+        case ERestoreContent.collection:
+          if (!infos.collection) {
+            this.errorMsg = this.$t(
+              "settings.backup.contentNotExist.collection"
+            ).toString();
+            return;
+          }
+          break;
+
+        case ERestoreContent.cookies:
+          if (!infos.cookies) {
+            this.errorMsg = this.$t(
+              "settings.backup.contentNotExist.cookies"
+            ).toString();
+            return;
+          }
+          break;
+      }
+
       if (confirm(this.$t("settings.backup.restoreConfirm").toString())) {
         try {
+          this.workingStatus.clear();
           // 恢复运行时配置
           if (
             infos.options &&
             (restoreContent == ERestoreContent.all ||
               restoreContent == ERestoreContent.options)
           ) {
+            this.workingStatus.add({
+              key: "options",
+              title: this.t("settings.backup.backupItem.base")
+            });
+
+            let sites: Site[] = [];
+
+            // 去除没有 host 字段的站点
+            // 可能因自定义的站点之前出错导致 host 缺失
+            infos.options.sites.forEach((site: Site) => {
+              if (site.host) {
+                sites.push(site);
+              }
+            });
+
+            infos.options.sites = sites;
+            // 不覆盖当前的密钥值
+            infos.options.encryptSecretKey = this.$store.state.options.encryptSecretKey;
+
             this.$store.dispatch("resetRunTimeOptions", infos.options);
+            this.workingStatus.update("options", EWorkingStatus.success);
           }
 
           // 恢复用户数据
@@ -469,7 +572,18 @@ export default Vue.extend({
             (restoreContent == ERestoreContent.all ||
               restoreContent == ERestoreContent.userDatas)
           ) {
-            extension.sendRequest(EAction.resetUserDatas, null, infos.datas);
+            this.workingStatus.add({
+              key: "userDatas",
+              title: this.t("settings.backup.backupItem.userDatas")
+            });
+            extension
+              .sendRequest(EAction.resetUserDatas, null, infos.datas)
+              .then(() => {
+                this.workingStatus.update("userDatas", EWorkingStatus.success);
+              })
+              .catch(() => {
+                this.workingStatus.update("userDatas", EWorkingStatus.error);
+              });
           }
 
           // 恢复收藏
@@ -478,6 +592,10 @@ export default Vue.extend({
             (restoreContent == ERestoreContent.all ||
               restoreContent == ERestoreContent.collection)
           ) {
+            this.workingStatus.add({
+              key: "collection",
+              title: this.t("settings.backup.backupItem.collection")
+            });
             extension
               .sendRequest(
                 EAction.resetTorrentCollections,
@@ -489,15 +607,83 @@ export default Vue.extend({
                 this.$store.dispatch("saveConfig", {
                   defaultCollectionGroupId: ""
                 });
+                this.workingStatus.update("collection", EWorkingStatus.success);
+              })
+              .catch(() => {
+                this.workingStatus.update("collection", EWorkingStatus.error);
               });
           }
 
-          // 恢复Cookies
+          // 恢复搜索快照
+          if (
+            infos.searchResultSnapshot &&
+            (restoreContent == ERestoreContent.all ||
+              restoreContent == ERestoreContent.searchResultSnapshot)
+          ) {
+            this.workingStatus.add({
+              key: "searchResultSnapshot",
+              title: this.t("settings.backup.backupItem.searchResultSnapshot")
+            });
+            extension
+              .sendRequest(
+                EAction.resetSearchResultSnapshot,
+                null,
+                infos.searchResultSnapshot
+              )
+              .then(() => {
+                this.workingStatus.update(
+                  "searchResultSnapshot",
+                  EWorkingStatus.success
+                );
+              })
+              .catch(() => {
+                this.workingStatus.update(
+                  "searchResultSnapshot",
+                  EWorkingStatus.error
+                );
+              });
+          }
+
+          // 恢复辅种任务
+          if (
+            infos.keepUploadTask &&
+            (restoreContent == ERestoreContent.all ||
+              restoreContent == ERestoreContent.keepUploadTask)
+          ) {
+            this.workingStatus.add({
+              key: "keepUploadTask",
+              title: this.t("settings.backup.backupItem.keepUploadTask")
+            });
+            extension
+              .sendRequest(
+                EAction.resetKeepUploadTask,
+                null,
+                infos.keepUploadTask
+              )
+              .then(() => {
+                this.workingStatus.update(
+                  "keepUploadTask",
+                  EWorkingStatus.success
+                );
+              })
+              .catch(() => {
+                this.workingStatus.update(
+                  "keepUploadTask",
+                  EWorkingStatus.error
+                );
+              });
+          }
+
+          // 恢复Cookies，需要放到最后一项
           if (
             infos.cookies &&
             (restoreContent == ERestoreContent.all ||
               restoreContent == ERestoreContent.cookies)
           ) {
+            this.workingStatus.add({
+              key: "cookies",
+              title: this.t("settings.backup.backupItem.cookies")
+            });
             PPF.usePermissions(
               ["cookies"],
               true,
@@ -514,11 +700,13 @@ export default Vue.extend({
                 this.successMsg = this.$t(
                   "settings.backup.restoreSuccess"
                 ).toString();
+                this.workingStatus.update("cookies", EWorkingStatus.success);
               })
               .catch(() => {
                 this.errorMsg = this.$t(
                   "settings.backup.restoreError"
                 ).toString();
+                this.workingStatus.update("cookies", EWorkingStatus.error);
               });
             return;
           }
@@ -544,7 +732,8 @@ export default Vue.extend({
      */
     editBackupServer(server: IBackupServer) {
       this.selectedItem = server;
-      this.showEditOWSS = true;
+      this.currentServerType = server.type;
+      this.showServerEdit = true;
     },
     /**
      * 更新备份服务器
@@ -559,7 +748,11 @@ export default Vue.extend({
      */
     removeBackupServer(server: IBackupServer) {
       if (confirm(this.$t("common.removeConfirm").toString())) {
+        let index = this.servers.findIndex((item: IBackupServer) => {
+          return item.id === server.id;
+        });
         this.$store.dispatch("removeBackupServer", server);
+        this.servers.splice(index, 1);
       }
     },
     /**
@@ -633,11 +826,8 @@ export default Vue.extend({
         });
     },
     showAddServer(type: EBackupServerType) {
-      switch (type) {
-        case EBackupServerType.OWSS:
-          this.showAddOWSS = true;
-          break;
-      }
+      this.currentServerType = type;
+      this.showServerAdd = true;
     },
     deleteFileFromBackupServer(
       server: IBackupServerPro,

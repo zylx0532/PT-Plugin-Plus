@@ -202,7 +202,40 @@ export enum EAction {
   // 获取所有收藏的链接地址
   getAllTorrentCollectionLinks = "getAllTorrentCollectionLinks",
   // 恢复Cookies
-  restoreCookies = "restoreCookies"
+  restoreCookies = "restoreCookies",
+  // 重置站点图标缓存
+  resetFavicons = "resetFavicons",
+  // 获取备份文件原始数据
+  getBackupRawData = "getBackupRawData",
+  // 测试备份服务器是否可连接
+  testBackupServerConnectivity = "testBackupServerConnectivity",
+  // 创建搜索结果快照
+  createSearchResultSnapshot = "createSearchResultSnapshot",
+  // 加载搜索结果快照
+  loadSearchResultSnapshot = "loadSearchResultSnapshot",
+  // 获取搜索结果快照内容
+  getSearchResultSnapshot = "getSearchResultSnapshot",
+  // 删除搜索结果快照
+  removeSearchResultSnapshot = "removeSearchResultSnapshot",
+  // 清除搜索结果快照
+  clearSearchResultSnapshot = "clearSearchResultSnapshot",
+  // 重置搜索结果快照
+  resetSearchResultSnapshot = "resetSearchResultSnapshot",
+
+  // 创建辅种任务
+  createKeepUploadTask = "createKeepUploadTask",
+  // 加载辅种任务
+  loadKeepUploadTask = "loadKeepUploadTask",
+  // 获取辅种任务内容
+  getKeepUploadTask = "getKeepUploadTask",
+  // 删除辅种任务
+  removeKeepUploadTask = "removeKeepUploadTask",
+  // 清除辅种任务
+  clearKeepUploadTask = "clearKeepUploadTask",
+  // 重置辅种任务
+  resetKeepUploadTask = "resetKeepUploadTask",
+  // 更新辅种任务
+  updateKeepUploadTask = "updateKeepUploadTask"
 }
 
 /**
@@ -223,7 +256,9 @@ export enum EConfigKey {
   uiOptions = "PT-Plugin-Plus-uiOptions",
   cache = "PT-Plugin-Plus-Cache-Contents",
   userDatas = "PT-Plugin-Plus-User-Datas",
-  collection = "PT-Plugin-Plus-Collection"
+  collection = "PT-Plugin-Plus-Collection",
+  searchResultSnapshot = "PT-Plugin-Plus-SearchResultSnapshot",
+  keepUploadTask = "PT-Plugin-Plus-KeepUploadTask"
 }
 
 /**
@@ -262,7 +297,8 @@ export enum EPaginationKey {
 
 export enum EViewKey {
   home = "home",
-  downloadPaths = "downloadPaths"
+  downloadPaths = "downloadPaths",
+  searchTorrent = "searchTorrent"
 }
 
 /**
@@ -314,7 +350,9 @@ export enum ETorrentStatus {
   // 正在做种
   sending = 2,
   // 已完成，未做种
-  completed = 255
+  completed = 255,
+  // 未活动（曾经下载过，但未完成）
+  inactive = 3
 }
 
 /**
@@ -348,5 +386,39 @@ export enum ERestoreContent {
   options = "options",
   userDatas = "userDatas",
   collection = "collection",
-  cookies = "cookies"
+  cookies = "cookies",
+  searchResultSnapshot = "searchResultSnapshot",
+  keepUploadTask = "keepUploadTask"
+}
+
+export enum EBrowserType {
+  Chrome = "Chrome",
+  Firefox = "Firefox"
+}
+
+export enum EWorkingStatus {
+  success = "success",
+  error = "error",
+  loading = "loading"
+}
+
+export enum EResourceOrderBy {
+  time = "time",
+  name = "name",
+  size = "size"
+}
+
+export enum EResourceOrderMode {
+  desc = "desc",
+  asc = "asc"
+}
+
+// 加密方式
+export enum EEncryptMode {
+  AES = "AES"
+}
+
+export enum ERestoreError {
+  needSecretKey = "needSecretKey",
+  errorSecretKey = "errorSecretKey"
 }

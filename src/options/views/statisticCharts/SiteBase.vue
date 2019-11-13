@@ -75,7 +75,8 @@ import {
 } from "@/interface/common";
 import html2canvas from "html2canvas";
 import FileSaver from "file-saver";
-import { PPF } from "../../../service/public";
+import { PPF } from "@/service/public";
+import dayjs from "dayjs";
 
 const extension = new Extension();
 
@@ -193,7 +194,7 @@ export default Vue.extend({
 
       for (const host in source) {
         if (source.hasOwnProperty(host)) {
-          const siteData = source[host];
+          const siteData = this.fillData(source[host]);
           let site: Site = this.options.sites.find((item: Site) => {
             return item.host == host;
           });
@@ -227,25 +228,15 @@ export default Vue.extend({
                 };
               }
 
-              if (data.uploaded && data.uploaded > 0) {
-                item.uploaded += parseFloat(data.uploaded);
-              }
-
-              if (data.downloaded && data.downloaded > 0) {
-                item.downloaded += parseFloat(data.downloaded);
-              }
+              item.uploaded += this.getNumber(data.uploaded);
+              item.downloaded += this.getNumber(data.downloaded);
 
               if (data.seeding && data.seeding > 0) {
                 item.seeding += Math.round(data.seeding);
               }
 
-              if (data.seedingSize && data.seedingSize > 0) {
-                item.seedingSize += parseFloat(data.seedingSize);
-              }
-
-              if (data.bonus && data.bonus > 0) {
-                item.bonus += parseFloat(data.bonus);
-              }
+              item.seedingSize += this.getNumber(data.seedingSize);
+              item.bonus += this.getNumber(data.bonus);
 
               if (!userNames[data.name]) {
                 userNames[data.name] = 0;
@@ -277,8 +268,70 @@ export default Vue.extend({
 
       return datas;
     },
+    getNumber(source: any) {
+      if (typeof source === "string") {
+        source = source.replace(/,/g, "");
+      }
+
+      if (/^(-)?\d+(.\d+)?$/.test(source)) {
+        return parseFloat(source.toString());
+      }
+
+      return 0;
+    },
+    /**
+     * 填充数据，将两个日期中间空白的数据由前一天数据填充
+     */
+    fillData(result: any) {
+      let datas: any = {};
+      let lastDate: any = null;
+      let lastData: any = null;
+      for (const key in result) {
+        if (dayjs(key).isValid()) {
+          let data = result[key];
+          // 如果当前数据不可用，则使用上一条数据
+          if (!data.isLogged || data.lastUpdateStatus != "success") {
+            data = lastData;
+          } else if (lastData && data.id != lastData.id) {
+            data = lastData;
+          }
+
+          if (!data) {
+            continue;
+          }
+
+          let date = dayjs(key);
+
+          if (!lastDate) {
+            lastDate = date;
+          }
+
+          if (!lastData) {
+            lastData = PPF.clone(data);
+          }
+
+          let day = date.diff(lastDate, "day");
+          if (day > 1) {
+            for (let index = 0; index < day - 1; index++) {
+              lastDate = lastDate.add(1, "day");
+              datas[lastDate.format("YYYY-MM-DD")] = lastData;
+            }
+          }
+
+          datas[key] = data;
+
+          lastData = PPF.clone(data);
+          lastDate = date;
+        }
+      }
+
+      datas["latest"] = result["latest"];
+
+      return datas;
+    },
     resetData(result: any) {
       if (this.host) {
+        result = this.fillData(result);
         this.resetBaseData(result);
         this.resetExtData(result);
       } else {
@@ -355,9 +408,11 @@ export default Vue.extend({
             continue;
           }
 
-          datas[0].data.push(parseFloat(data.uploaded));
-          datas[1].data.push(parseFloat(data.downloaded));
-          datas[2].data.push(parseFloat(data.bonus));
+          const time = new Date(date).getTime();
+
+          datas[0].data.push([time, this.getNumber(data.uploaded)]);
+          datas[1].data.push([time, this.getNumber(data.downloaded)]);
+          datas[2].data.push([time, this.getNumber(data.bonus)]);
           categories.push(date);
         }
       }
@@ -383,7 +438,14 @@ export default Vue.extend({
           }).toString()
         },
         xAxis: {
-          categories: categories,
+          type: "datetime",
+          dateTimeLabelFormats: {
+            day: "%Y-%m-%d",
+            week: "%Y-%m-%d",
+            month: "%Y-%m-%d",
+            year: "%Y-%m-%d"
+          },
+          // categories: categories,
           gridLineDashStyle: "ShortDash",
           gridLineWidth: 1,
           gridLineColor: "#dddddd"
@@ -431,6 +493,11 @@ export default Vue.extend({
         ],
         tooltip: {
           shared: true,
+          crosshairs: {
+            width: 1,
+            color: "red",
+            dashStyle: "shortdot"
+          },
           useHTML: true,
           formatter: function(): any {
             function createTipItem(text: string, color: string = "#000") {
@@ -438,7 +505,8 @@ export default Vue.extend({
             }
             let _this = this as any;
             let tips: string[] = [];
-            tips.push(createTipItem(_this.x));
+            // 标题（时间）
+            tips.push(createTipItem(dayjs(_this.x).format("YYYY-MM-DD")));
             _this.points.forEach((point: any) => {
               let value = point.y;
               switch (point.series.name) {
@@ -458,7 +526,6 @@ export default Vue.extend({
             });
 
             let result = `<div>${tips.join("")}</div>`;
-            console.log(result);
             return result;
           }
         }
@@ -511,8 +578,10 @@ export default Vue.extend({
             continue;
           }
 
-          datas[0].data.push(parseFloat(data.seedingSize));
-          datas[1].data.push(parseFloat(data.seeding));
+          const time = new Date(date).getTime();
+
+          datas[0].data.push([time, parseFloat(data.seedingSize)]);
+          datas[1].data.push([time, parseFloat(data.seeding)]);
           categories.push(date);
         }
       }
@@ -538,7 +607,14 @@ export default Vue.extend({
           }).toString()
         },
         xAxis: {
-          categories: categories,
+          // categories: categories,
+          type: "datetime",
+          dateTimeLabelFormats: {
+            day: "%Y-%m-%d",
+            week: "%Y-%m-%d",
+            month: "%Y-%m-%d",
+            year: "%Y-%m-%d"
+          },
           gridLineDashStyle: "ShortDash",
           gridLineWidth: 1,
           gridLineColor: "#dddddd"
@@ -587,13 +663,19 @@ export default Vue.extend({
         tooltip: {
           shared: true,
           useHTML: true,
+          crosshairs: {
+            width: 1,
+            color: "red",
+            dashStyle: "shortdot"
+          },
           formatter: function(): any {
             function createTipItem(text: string, color: string = "#000") {
               return `<div style='color:${color};'>${text}</div>`;
             }
             let _this = this as any;
             let tips: string[] = [];
-            tips.push(createTipItem(_this.x));
+            // 标题（时间）
+            tips.push(createTipItem(dayjs(_this.x).format("YYYY-MM-DD")));
             _this.points.forEach((point: any) => {
               let value = point.y;
               switch (point.series.name) {
@@ -609,7 +691,6 @@ export default Vue.extend({
             });
 
             let result = `<div>${tips.join("")}</div>`;
-            console.log(result);
             return result;
           }
         }
