@@ -2,7 +2,8 @@
   "name": "简体中文 Chinese (Simplified)",
   "code": "zh-CN",
   "authors": [
-    "栽培者"
+    "栽培者",
+    "MewX"
   ],
   "words": {
     "app": {
@@ -17,6 +18,7 @@
       "addLanguage": "临时添加新语言",
       "version": "版本",
       "systemLog": "系统日志",
+      "darkMode": "反转颜色",
       "haveNewReleases": "有更新可用",
       "add": "新增",
       "edit": "编辑",
@@ -49,7 +51,11 @@
         "desc": "降序"
       },
       "close": "关闭",
-      "copyed": "已复制"
+      "copyed": "已复制",
+      "hot": "热门",
+      "loading": "正在加载……",
+      "lastUpdate": "数据更新于 {time}",
+      "refresh": "刷新"
     },
     "topbar": {
       "title": "@:(app.name)",
@@ -87,7 +93,8 @@
       "support": {
         "title": "支持本项目",
         "bugReport": "Bug反馈",
-        "donate": "捐赠"
+        "donate": "捐赠",
+        "debugger": "调试信息"
       }
     },
     "permissions": {
@@ -156,6 +163,10 @@
       "siteName": "网站名称",
       "userName": "用户名称",
       "userLevel": "用户等级",
+      "levelRequirements": "等级要求",
+      "seedingPoints": "保种积分",
+      "showHnR": "H&R",
+      "selectColumns": "过滤列",
       "week": "时间显示为周数",
       "timeline": "时间轴",
       "settings": "参数",
@@ -167,7 +178,9 @@
       "getUserInfoError": "发生错误",
       "getUserInfoAbort": "{siteName} 获取用户资料请求已取消",
       "getUserInfoAbortError": "{siteName} 获取用户资料请求取消失败",
+      "offline":"已离线",
       "headers": {
+        "date": "日期",
         "site": "站点",
         "userName": "用户名",
         "levelName": "等级",
@@ -176,11 +189,46 @@
         "seeding": "做种数",
         "seedingSize": "做种体积",
         "bonus": "魔力值/积分",
+        "seedingPoints": "做种积分",
+        "bonusPerHour": "时魔",
         "joinTime": "入站时间",
         "lastUpdateTime": "数据更新于",
-        "status": "状态"
+        "status": "状态",
+        "uploads": "发布",
+        "trueDownloaded": "真实下载",
+        "classPoints": "等级积分",
+        "unsatisfieds": "H&R考核中",
+        "prewarn": "H&R预警"
       },
-      "tip": "N/A 表示暂不支持"
+      "levelRequirement": {
+        "levelRequirements": "升级要求",
+        "date": "日期",
+        "site": "站点",
+        "userName": "用户名",
+        "levelName": "等级",
+        "activitiyData": "数据量",
+        "ratio": "分享率",
+        "seeding": "做种数",
+        "seedingSize": "做种体积",
+        "seedingTime": "做种时间",
+        "bonus": "魔力值",
+        "seedingPoints": "做种积分",
+        "bonusPerHour": "时魔",
+        "joinTime": "入站时间",
+        "lastUpdateTime": "数据更新于",
+        "status": "状态",
+        "uploaded": "上传量",
+        "downloaded":"下载量",
+        "uploads": "发布",
+        "downloads": "完成",
+        "trueDownloaded": "真实下载",
+        "classPoints": "等级积分",
+        "uniqueGroups": "独特分组",
+        "perfectFLAC": "“完美”FLAC",
+        "alternative": "择一"
+      },
+      "tip": "N/A 表示暂不支持",
+      "nodata": "您还没有添加站点，请前往『站点设置』添加站点。"
     },
     "systemLog": {
       "title": "系统日志",
@@ -210,10 +258,23 @@
     "timeline": {
       "share": "生成分享图片",
       "siteName": "网站名称",
+      "blurSiteIcon": "模糊站点图标",
       "userName": "用户名称",
+      "userId": "用户UID",
       "userLevel": "用户等级",
+      "showSites": "展示站点",
       "close": "关闭",
       "shareMessage": "这些年走过的路",
+      "time": {
+        "year": "年",
+        "month": "月",
+        "day": "日",
+        "hour": "时",
+        "mins": "分",
+        "week": "周",
+        "ago": "前",
+        "lessThanAWeek": "不满一周"
+      },
       "total": {
         "uploaded": "上传总量：",
         "downloaded": "下载总量：",
@@ -227,7 +288,8 @@
         "downloaded": "下载量：",
         "seedingSize": "做种量：",
         "ratio": "分享率：",
-        "bonus": "积分值："
+        "bonus": "积分值：",
+        "bonusPerHour": "时　魔："
       },
       "inputDisplayName": "请输入需要显示的名称：",
       "inputShareMessage": "请输入需要显示的信息："
@@ -264,6 +326,7 @@
         "seeders": "上传",
         "leechers": "下载",
         "completed": "完成",
+        "comments": "评论",
         "time": "发布于(≈)",
         "action": "操作"
       },
@@ -365,9 +428,13 @@
         "restoreCookies": "仅恢复站点Cookies",
         "restoreSearchResultSnapshot": "仅恢复搜索结果快照",
         "restoreKeepUploadTask": "仅恢复辅种任务",
+        "restoreDownloadHistory": "仅恢复下载历史",
         "contentNotExist": {
           "cookies": "备份文件中不存在Cookies",
-          "collection": "备份文件中不存在收藏信息"
+          "collection": "备份文件中不存在收藏信息",
+          "searchResultSnapshot": "备份文件中不存在搜索结果快照",
+          "keepUploadTask": "备份文件中不存在辅种任务",
+          "downloadHistory": "备份文件中不存在下载历史"
         },
         "backupItem": {
           "base": "常规设置",
@@ -375,17 +442,19 @@
           "collection": "我的收藏",
           "cookies": "Cookies",
           "searchResultSnapshot": "搜索结果快照",
-          "keepUploadTask": "辅种任务"
+          "keepUploadTask": "辅种任务",
+          "downloadHistory": "下载历史"
         },
         "restoreErrorType": {
           "needSecretKey": "需要密钥",
           "errorSecretKey": "密钥错误"
         },
-        "enterSecretKey": "请输入密钥："
+        "enterSecretKey": "请输入密钥：",
+        "restoreCookiesConfirm": "备份内容包含 Cookies，是否需要恢复Cookies？此操作可能造成一些意想不到的结果。"
       },
       "base": {
         "title": "常规设置",
-        "defaultClient": "默认下载服务器（必选）",
+        "defaultClient": "默认下载服务器",
         "autoUpdate": "自动更新官方数据",
         "save": "保存",
         "allowSelectionTextSearch": "启用页面内容选择搜索",
@@ -435,8 +504,8 @@
           "omdb": "OMDb API Key",
           "douban": "豆瓣 API Key"
         },
-        "apiKeyTip": "OMDb API Key 用于获取影片的评分信息；\n豆瓣 API Key 用于获取影片的基本资料，如图片、简介等；\n助手已内置了些一Key，如出现无法正常获取评分或影片资料，可进行设置；多个Key按回车进行区分。",
-        "verifyApiKey": "验证 Api Key",
+        "apiKeyTip": "OMDb API Key 用于获取影片的评分信息；\n豆瓣 API Key 用于获取影片的基本资料，如图片、简介等；\n助手已内置了一些Key，如出现无法正常获取评分或影片资料，可进行设置；多个Key按回车进行区分。",
+        "verifyApiKey": "验证 API Key",
         "batchDownloadInterval": "批量下载（发送）种子时，每个链接时间间隔（秒）",
         "enableBackgroundDownload": "当批量下载（发送）种子时，使用后台任务，完成后再通知我",
         "position": {
@@ -449,7 +518,8 @@
         "encryptMode": "加密方式：",
         "encryptSecretKey": "密钥：",
         "encryptTip": "注意：密钥仅保存在当前浏览器，不会备份，请妥善保存；加密后如密钥丢失将无法恢复数据。",
-        "createSecretKey": "随机生成"
+        "createSecretKey": "随机生成",
+        "allowSaveSnapshot": "允许保存搜索结果快照"
       },
       "downloadClients": {
         "add": {
@@ -476,6 +546,7 @@
           "loginPwd": "登录密码",
           "id": "ID",
           "autoStart": "发送种子时自动开始下载",
+          "tagIMDb": "发送种子时自动添加IMDb标签（Beta）",
           "autoCreate": "<保存后自动生成>",
           "test": "测试服务器是否可连接",
           "testSuccess": "服务器可连接",
@@ -640,7 +711,15 @@
           "cdnTip": "如您使用的网址和系统定义的不同，可在此填写当前使用的网站地址，每行填写一个地址，第一个将做为搜索时使用的地址",
           "priority": "优先级",
           "priorityTip": "可用于搜索排序",
-          "offline": "站点已离线（停机/关闭）"
+          "offline": "站点已离线（停机/关闭）",
+          "timezone": "时区",
+          "upLoadLimit": "上传速度限制",
+          "upLoadLimitTip": "上传速度限制 (KB/s), 0或不填 不限速",
+          "disableMessageCount": "关闭消息提醒"
+        },
+        "userinfo": {
+          "title": "用户数据",
+          "deleteConfirm": "确认删除？这个操作不可恢复，请确认你做好了相应备份。"
         },
         "index": {
           "importAll": "一键导入站点",
@@ -649,6 +728,7 @@
           "removeConfirm": "确认要删除这个站点吗？",
           "removeTitle": "删除确认",
           "plugins": "插件",
+          "showUserInfo": "用户数据",
           "title": "站点设置",
           "subTitle": "只有配置过的站点才会显示插件图标及相应的功能；<br/>已离线的站点不再参与搜索和信息获取；",
           "searchEntry": "搜索入口",
@@ -716,9 +796,20 @@
       "seedingDataSubTitle": "做种体积：{seedingSize}, 数量：{count} 个",
       "seedingSize": "做种体积",
       "seedingCount": "做种数",
+      "barDataTitle": "[{userName}@{site}] 上传数据",
       "size": "体积",
       "count": "数量",
-      "note": "注：<br>1. 图表历史数据来自概览页，手动刷新或自动更新均会记录；<br>2. 助手从 v1.0.1 版开始正式记录每次刷新的数据，每个站每天仅保存一条；"
+      "total": "总和",
+      "percent": "占比",
+      "note": "注：<br>1. 图表历史数据来自概览页，手动刷新或自动更新均会记录；<br>2. 助手从 v1.0.1 版开始正式记录每次刷新的数据，每个站每天仅保存一条；",
+      "dateRange": {
+        "7day": "近7天",
+        "30day": "近30天",
+        "60day": "近60天",
+        "90day": "近90天",
+        "180day": "近180天",
+        "all": "所有"
+      }
     },
     "service": {
       "testClientConnectivityFailed": "测试客户连接失败[{address}]",
@@ -729,6 +820,9 @@
         "searchSelectionText": "搜索 \"%s\" 相关的种子",
         "searchSelectionTextOnThisSite": "仅搜索本站 \"%s\" 相关的种子",
         "searchByIMDb": "搜索当前IMDb相关种子",
+        "searchByDouban": "搜索当前豆瓣链接相关种子",
+        "searchByDefault": "按默认方式搜索",
+        "searchInAllSite": "在所有站点中搜索",
         "downloadClientPath": "{clientName} -> 指定目录",
         "userCanceled": "用户已取消",
         "pluginStatusIsUnknown": "插件状态未知，当前操作可能失败，请刷新页面后再试",
@@ -748,7 +842,8 @@
         "siteEvalScriptFailed": "[{site.name}]脚本执行出错！",
         "siteSearchResultError": "[{site.name}]没有返回预期的数据。",
         "siteAbortSearch": "正在取消[{site.host}]的搜索请求",
-        "siteAbortSearchError": "[{site.host}]取消搜索请求失败！"
+        "siteAbortSearchError": "[{site.host}]取消搜索请求失败！",
+        "siteNetworkFailed": "[{site.name}]网络请求失败！({msg})"
       },
       "controller": {
         "invalidAddress": "无效的地址",
@@ -774,6 +869,8 @@
       "user": {
         "notSupported": "暂不支持",
         "notLogged": "未登录",
+        "needLogin": "未登录",
+        "unknown": "未知错误",
         "getUserInfoFailed": "获取用户名和编号失败",
         "abortGetUserInfoFailed": "取消获取用户信息请求失败"
       }
@@ -829,7 +926,8 @@
         "noTorrents": "[{siteName}]没有搜索到相关的种子",
         "torrentTableIsEmpty": "[{siteName}]没有定位到种子列表，或没有相关的种子",
         "parseError": "[{siteName}]获取种子信息出错: {error}"
-      }
+      },
+      "dragTitle": "按住拖放；双击复位"
     },
     "downloadClient": {
       "timeout": "连接超时",
@@ -893,6 +991,7 @@
       "createSuccess": "辅种任务创建完成，请到辅种任务列表中进行后续操作",
       "createError": "辅种任务创建失败",
       "noItem": "没有符合条件的种子",
+      "filterSearchResults": "过滤搜索结果",
       "savePath": "保存目录：",
       "defaultPath": "默认目录",
       "setSavePath": "设置保存目录",
@@ -908,11 +1007,17 @@
       "size": "大小：",
       "fileCount": "文件数：",
       "sendConfirm": "是否确认要发送这 {count} 个种子？",
+      "addToKeepUpload": "添加至辅种列表",
+      "removeFromKeepUpload": "移除种子",
+      "redownload" : "重新下载",
+      "addToKeepUploadConfirm": "该种子未能通过初步校验，确认要添加吗？",
       "status": {
         "label": "状态：",
         "downloading": "正在下载",
         "downloaded": "下载完成",
         "failed": "校验失败",
+        "incorrectOrder": "文件顺序错误",
+        "missingFiles": "缺少文件",
         "success": "校验成功",
         "waiting": "等待校验",
         "downloadFailed": "下载失败"

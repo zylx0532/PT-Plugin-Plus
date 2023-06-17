@@ -1,8 +1,9 @@
 {
-  "name":"PTP",
+  "name": "PTP",
+  "timezoneOffset": "+0000",
   "description": "电影",
-  "url":"https://passthepopcorn.me/",
-  "icon":"https://passthepopcorn.me/favicon.ico",
+  "url": "https://passthepopcorn.me/",
+  "icon": "https://passthepopcorn.me/favicon.ico",
   "tags": ["电影"],
   "schema": "Gazelle",
   "host": "passthepopcorn.me",
@@ -11,11 +12,17 @@
     "page": "/torrents.php",
     "resultType": "json",
     "parseScriptFile": "getSearchResult.js",
-    "queryString": "searchstr=$key$&grouping=0&json=noredirect"
+    "queryString": "searchstr=$key$&grouping=0&inallakas=1&json=noredirect"
   },
   "searchEntry": [{
-    "name": "全部",
+    "name": "Normal",
     "enabled": true
+  },
+  {
+    "name": "filelist",
+    "skipIMDbId": true,
+    "queryString":"filelist=$key$&grouping=0&json=noredirect",
+    "enabled": false
   }],
   "selectors": {
     "userBaseInfo": {
@@ -44,19 +51,19 @@
       "fields": {
         "uploaded": {
           "selector": ["a.user-info-bar__link[href*='type=seeding']:first"],
-          "filters": ["query.attr('title').sizeToNumber()"] 
+          "filters": ["query.attr('title').replace(/,/g,'').sizeToNumber()"]
         },
         "downloaded": {
           "selector": ["a.user-info-bar__link[href*='type=leeching']:first"],
-          "filters": ["query.attr('title').sizeToNumber()"] 
+          "filters": ["query.attr('title').replace(/,/g,'').sizeToNumber()"]
         },
         "ratio": {
           "selector": "ul.list > li:contains('Ratio:')",
-          "filters": ["query.text().replace(/,|\\n|\\s+/g,'').match(/Ratio.+?([\\d.]+)/)", "(query && query.length>=2)?query[1]:0"]
+          "filters": ["query.text().replace(/,|\\n|\\s+/g,'').match(/Ratio.+?([\\d.]+)/)", "(query && query.length>=2)?query[1]:null"]
         },
         "seeding": {
           "selector": "ul.list > li:contains('Seeding:')",
-          "filters": ["query.text().trim().replace(/,|\\n/g,'').match(/:.+?([\\d.]+)/)", "(query && query.length>=2)?parseFloat(query[1]):0"]
+          "filters": ["query.text().trim().replace(/,|\\n/g,'').match(/:.+?([\\d.]+)/)", "(query && query.length>=2)?parseFloat(query[1]):null"]
         },
         "seedingSize": {
           "selector": "ul.list > li:contains('Seeding size:')",
@@ -73,6 +80,25 @@
         "joinTime": {
           "selector": ["ul.list > li:contains('Joined:') > span"],
           "filters": ["query.attr('title')||query.text()", "dateTime(query).isValid()?dateTime(query).valueOf():query"]
+        }
+      }
+    },
+    "userSeedingTorrents": {
+      "page": "/torrents.php?type=seeding&userid=$user.id$",
+      "parser": "getUserSeedingTorrents.js",
+      "fields": {
+        "seedingList": {
+          "selector": ["script:last"],
+          "filters": ["query.text()", "[...query.matchAll(/\"TorrentId\":(\\d+)/g)]", "jQuery.map(query, i=>i[1])"]
+        }
+      }
+    },
+    "common": {
+	    "page": "/torrents.php",
+      "fields": {
+        "confirmSize": {
+          "selector": ["tr.basic-movie-list__torrent-row > td:contains('iB')"],
+          "filters": ["query"]
         }
       }
     }

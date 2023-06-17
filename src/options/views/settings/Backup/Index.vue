@@ -87,8 +87,6 @@
           <td>
             <a @click="editBackupServer(props.item)">{{ props.item.name }}</a>
           </td>
-          <td>{{ props.item.type }}</td>
-          <td>{{ props.item.lastBackupTime | formatDate }}</td>
           <td>
             <v-btn
               flat
@@ -138,9 +136,11 @@
               <v-icon small>delete</v-icon>
             </v-btn>
           </td>
+          <td>{{ props.item.type }}</td>
+          <td>{{ props.item.lastBackupTime | formatDate }}</td>
         </template>
         <template slot="expand" slot-scope="props">
-          <div class="px-5">
+          <div class="px-5" style="padding-left: 80px !important;">
             <ServerList
               :items="props.item.dataList"
               :server="props.item"
@@ -182,7 +182,8 @@ import {
   EBrowserType,
   IWorkingStatusItem,
   EWorkingStatus,
-  Site
+  Site,
+  EInstallType
 } from "@/interface/common";
 import { PPF } from "@/service/public";
 import { FileDownloader } from "@/service/downloader";
@@ -193,6 +194,7 @@ import ServerList from "./Server/List.vue";
 
 import { BackupFileParser } from "@/service/backupFileParser";
 import WorkingStatus from "@/options/components/WorkingStatus.vue";
+import { APP } from "@/service/api";
 
 interface IBackupServerPro extends IBackupServer {
   loading?: boolean;
@@ -226,7 +228,7 @@ export default Vue.extend({
         restoreFromGoogle: false,
         clearFromGoogle: false
       },
-      isDevelopmentMode: false,
+      isDevelopmentMode: true,
       pagination: {
         rowsPerPage: -1
       },
@@ -256,14 +258,16 @@ export default Vue.extend({
     this.fileInput.removeEventListener("change", this.restoreFile);
   },
   created() {
-    if (chrome && chrome.management) {
-      chrome.management.getSelf(result => {
-        // 安装于开发者模式
-        if (result.installType == "development") {
-          this.isDevelopmentMode = true;
-        }
+    APP.getInstallType()
+      .then(result => {
+        this.isDevelopmentMode = [
+          EInstallType.development,
+          EInstallType.crx
+        ].includes(result);
+      })
+      .catch(() => {
+        console.log("获取安装方式失败");
       });
-    }
 
     this.initBackupServers();
   },
@@ -449,15 +453,10 @@ export default Vue.extend({
      */
     createBackupFile() {
       switch (PPF.browserName) {
-        case EBrowserType.Firefox:
+        case EBrowserType.Chrome:
           extension
-            .sendRequest(EAction.getBackupRawData)
+            .sendRequest(EAction.createBackupFile)
             .then(result => {
-              backupFileParser
-                .createBackupFileBlob(result)
-                .then((blob: any) => {
-                  FileSaver.saveAs(blob, PPF.getNewBackupFileName());
-                });
               console.log(result);
             })
             .catch(error => {
@@ -468,8 +467,13 @@ export default Vue.extend({
 
         default:
           extension
-            .sendRequest(EAction.createBackupFile)
+            .sendRequest(EAction.getBackupRawData)
             .then(result => {
+              backupFileParser
+                .createBackupFileBlob(result)
+                .then((blob: any) => {
+                  FileSaver.saveAs(blob, PPF.getNewBackupFileName());
+                });
               console.log(result);
             })
             .catch(error => {
@@ -528,6 +532,33 @@ export default Vue.extend({
           if (!infos.cookies) {
             this.errorMsg = this.$t(
               "settings.backup.contentNotExist.cookies"
+            ).toString();
+            return;
+          }
+          break;
+
+        case ERestoreContent.keepUploadTask:
+          if (!infos.keepUploadTask) {
+            this.errorMsg = this.$t(
+              "settings.backup.contentNotExist.keepUploadTask"
+            ).toString();
+            return;
+          }
+          break;
+
+        case ERestoreContent.searchResultSnapshot:
+          if (!infos.searchResultSnapshot) {
+            this.errorMsg = this.$t(
+              "settings.backup.contentNotExist.searchResultSnapshot"
+            ).toString();
+            return;
+          }
+          break;
+
+        case ERestoreContent.downloadHistory:
+          if (!infos.downloadHistory) {
+            this.errorMsg = this.$t(
+              "settings.backup.contentNotExist.downloadHistory"
             ).toString();
             return;
           }
@@ -674,12 +705,55 @@ export default Vue.extend({
               });
           }
 
+          // 恢复下载历史
+          if (
+            infos.downloadHistory &&
+            (restoreContent == ERestoreContent.all ||
+              restoreContent == ERestoreContent.downloadHistory)
+          ) {
+            this.workingStatus.add({
+              key: "downloadHistory",
+              title: this.t("settings.backup.backupItem.downloadHistory")
+            });
+            extension
+              .sendRequest(
+                EAction.resetDownloadHistory,
+                null,
+                infos.downloadHistory
+              )
+              .then(() => {
+                this.workingStatus.update(
+                  "downloadHistory",
+                  EWorkingStatus.success
+                );
+              })
+              .catch(() => {
+                this.workingStatus.update(
+                  "downloadHistory",
+                  EWorkingStatus.error
+                );
+              });
+          }
+
           // 恢复Cookies，需要放到最后一项
           if (
             infos.cookies &&
             (restoreContent == ERestoreContent.all ||
-              restoreContent == ERestoreContent.cookies)
+              restoreContent == ERestoreContent.cookies) &&
+            PPF.checkOptionalPermission("cookies")
           ) {
+            // 当恢复所有内容，并且包含cookies时，需要确认是否恢复
+            if (
+              restoreContent == ERestoreContent.all &&
+              !confirm(
+                this.$t("settings.backup.restoreCookiesConfirm").toString()
+              )
+            ) {
+              this.successMsg = this.$t(
+                "settings.backup.restoreSuccess"
+              ).toString();
+              return;
+            }
             this.workingStatus.add({
               key: "cookies",
               title: this.t("settings.backup.backupItem.cookies")
@@ -871,7 +945,13 @@ export default Vue.extend({
         {
           text: this.$t("settings.backup.index.headers.name"),
           align: "left",
+          width: 280,
           value: "name"
+        },
+        {
+          text: this.$t("settings.backup.index.headers.action"),
+          value: "name",
+          sortable: false
         },
         {
           text: this.$t("settings.backup.index.headers.type"),
@@ -882,11 +962,6 @@ export default Vue.extend({
           text: this.$t("settings.backup.index.headers.lastBackupTime"),
           align: "left",
           value: "lastBackupTime"
-        },
-        {
-          text: this.$t("settings.backup.index.headers.action"),
-          value: "name",
-          sortable: false
         }
       ];
     }

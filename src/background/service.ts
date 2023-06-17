@@ -7,7 +7,8 @@ import {
   Site,
   SiteSchema,
   Dictionary,
-  EUserDataRequestStatus
+  EUserDataRequestStatus,
+  LogItem
 } from "@/interface/common";
 import Config from "./config";
 import Controller from "./controller";
@@ -78,7 +79,7 @@ export default class PTPlugin {
    * @param callback 回调函数
    */
   public requestMessage(request: Request, sender?: any): Promise<any> {
-    console.log("requestMessage", request.action);
+    this.debug(`${ELogEvent.requestMessage}.${request.action}`);
     return new Promise<any>((resolve?: any, reject?: any) => {
       let result: any;
       // if (
@@ -437,8 +438,9 @@ export default class PTPlugin {
                   new Date().getTime() + failedRetryInterval * 60000;
                 this.debug(
                   "数据刷新失败, 下次重试时间",
-                  new Date(this.options
-                    .autoRefreshUserDataNextTime as number).toLocaleString()
+                  new Date(
+                    this.options.autoRefreshUserDataNextTime as number
+                  ).toLocaleString()
                 );
               } else {
                 this.debug("数据刷新失败, 重试次数已超限制");
@@ -488,8 +490,22 @@ export default class PTPlugin {
    * 输出调试信息
    * @param msg
    */
-  public debug(...msg: any) {
-    console.log(new Date().toLocaleString(), ...msg);
+  public debug(...msgs: any[]) {
+    msgs.forEach((msg: any) => {
+      this.controller.pushDebugMsg(msg);
+    });
+  }
+
+  public writeLog(msg: LogItem) {
+    this.logger.add(msg);
+  }
+
+  public writeErrorLog(msg: any) {
+    this.logger.add({
+      module: EModule.background,
+      event: "一般错误",
+      msg: typeof msg === "string" ? msg : JSON.stringify(msg)
+    });
   }
 
   /**
@@ -531,11 +547,20 @@ export default class PTPlugin {
       console.log("chrome.runtime.onInstalled", details);
       // 版本更新时
       if (details.reason == "update") {
-        setTimeout(() => {
-          this.userData.upgrade();
-        }, 1000);
+        this.upgrade();
       }
     });
+  }
+
+  /**
+   * 升级相关内容
+   */
+  public upgrade() {
+    // 显示更新日志
+    this.controller.openURL("changelog.html");
+    setTimeout(() => {
+      this.userData.upgrade();
+    }, 1000);
   }
 
   /**
@@ -572,7 +597,7 @@ export default class PTPlugin {
 
   /**
    * 获取指定选择器
-   * @param host
+   * @param hostOrSite
    * @param name
    */
   public getSiteSelector(
@@ -581,9 +606,10 @@ export default class PTPlugin {
   ): Dictionary<any> | null {
     let host = typeof hostOrSite == "string" ? hostOrSite : hostOrSite.host;
     let system = this.clone(this.options.system);
-
-    // 由于选择器可能会更新，所以需要从系统配置中加载
-    let site: Site | undefined = system.sites.find((item: Site) => {
+    // 由于选择器可能会更新，所以优先从系统配置中加载
+    // 增加 this.options.sites 是为了兼顾自定义站点
+    let sites = system.sites.concat(this.options.sites);
+    let site: Site | undefined = sites.find((item: Site) => {
       return item.host === host;
     });
 

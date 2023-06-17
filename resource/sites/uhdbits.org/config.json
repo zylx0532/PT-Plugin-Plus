@@ -1,11 +1,12 @@
 {
   "name": "UHDBits",
+  "timezoneOffset": "+0000",
   "description": "HD",
   "icon": "https://uhdbits.org/favicon.ico",
   "schema": "GazelleJSONAPI",
   "tags": ["影视"],
   "url": "https://uhdbits.org/",
-  "collaborator": "bimzcy, enigamz",
+  "collaborator": ["bimzcy", "enigamz"],
   "host": "uhdbits.org",
   "searchEntryConfig": {
     "page": "/torrents.php",
@@ -60,14 +61,19 @@
   "selectors": {
     "userSeedingTorrents": {
       "page": "/torrents.php?type=seeding&userid=$user.id$",
+      "parser": "getUserSeedingTorrents.js",
       "fields": {
+        "bonus": {
+          "selector": ["[href='bonus.php']+span"],
+          "filters": ["query.text()"]
+        },
         "seedingSize": {
           "selector": ["td.number_column.nobr"],
           "filters": ["jQuery.map(query, (item)=>{return $(item).text();})", "_self.getTotalSize(query)"]
         },
-        "bonus": {
-          "selector": ["[href='bonus.php']+span"],
-          "filters": ["query.text()"]
+        "seedingList": {
+          "selector": ["a[href*='torrentid=']"],
+          "filters": ["jQuery.map(query, item=>$(item).attr('href').match(/torrentid=(\\d+)/)[1])"]
         }
       }
     }

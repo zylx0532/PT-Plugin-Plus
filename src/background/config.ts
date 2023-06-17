@@ -13,7 +13,8 @@ import {
   EBackupServerType,
   EUserDataRange,
   EPluginPosition,
-  IBackupRawData
+  IBackupRawData,
+  ISiteIcon
 } from "@/interface/common";
 import { API, APP } from "@/service/api";
 import localStorage from "@/service/localStorage";
@@ -36,7 +37,7 @@ class Config {
   private name: string = EConfigKey.default;
   private localStorage: localStorage = new localStorage();
   public syncStorage: SyncStorage = new SyncStorage();
-  public favicon: Favicon = new Favicon();
+  public favicon: Favicon = new Favicon(this.service);
 
   public schemas: any[] = [];
   public sites: any[] = [];
@@ -71,7 +72,7 @@ class Config {
     needConfirmWhenExceedSize: true,
     exceedSize: 10,
     search: {
-      rows: 10,
+      rows: 50,
       // 搜索超时
       timeout: 30000,
       saveKey: true
@@ -108,7 +109,8 @@ class Config {
     // 助手工具栏显示位置
     position: EPluginPosition.right,
     // 是否加密存储备份数据
-    encryptBackupData: false
+    encryptBackupData: false,
+    allowSaveSnapshot: true
   };
 
   public uiOptions: UIOptions = {};
@@ -140,21 +142,63 @@ class Config {
         });
       }
 
-      this.favicon.gets(urls).then((results: any[]) => {
-        results.forEach((result: any) => {
+      this.favicon
+        .gets(urls)
+        .then((results: any[]) => {
+          results.forEach((result: any) => {
+            let site = this.options.sites.find((item: Site) => {
+              let cdn = [item.url].concat(item.cdn, item.formerHosts?.map(x => `//${x}`));
+              return (
+                item.host == result.host ||
+                cdn.join("").indexOf(`//${result.host}`) > -1
+              );
+            });
+
+            if (site) {
+              site.icon = result.data;
+            }
+          });
+
+          this.save();
+          this.service.options = this.options;
+          resolve(this.options);
+        })
+        .catch(error => {
+          this.service.debug(error);
+          reject(error);
+        });
+    });
+  }
+
+  /**
+   * 获取单个站点图标
+   * @param url
+   */
+  public getFavicon(url: string, reset: boolean = false): Promise<any> {
+    return new Promise<any>((resolve?: any, reject?: any) => {
+      this.favicon
+        .get(url, reset)
+        .then((result: ISiteIcon) => {
           let site = this.options.sites.find((item: Site) => {
-            return item.host === result.host;
+            let cdn = [item.url].concat(item.cdn, item.formerHosts?.map(x => `//${x}`));
+            return (
+              item.host == result.host ||
+              cdn.join("").indexOf(`//${result.host}`) > -1
+            );
           });
 
           if (site) {
             site.icon = result.data;
+            this.save();
+            this.service.options = this.options;
           }
-        });
 
-        this.save();
-        this.service.options = this.options;
-        resolve(this.options);
-      });
+          resolve(result);
+        })
+        .catch(error => {
+          this.service.debug(error);
+          reject(error);
+        });
     });
   }
 
@@ -183,7 +227,8 @@ class Config {
             "activeURL",
             "searchEntryConfig",
             "schema",
-            "supportedFeatures"
+            "supportedFeatures",
+            "mergeSchemaTagSelectors"
           ].forEach((key: string) => {
             let _item = item as any;
             if (_item[key]) {
@@ -335,6 +380,13 @@ class Config {
             _site.patterns = systemSite.patterns;
           }
 
+          // 更新升级要求
+          if (!systemSite.levelRequirements && _site.levelRequirements) {
+            delete _site.levelRequirements;
+          } else {
+            _site.levelRequirements = systemSite.levelRequirements;
+          }
+
           // 合并系统定义的搜索入口
           if (_site.searchEntry && systemSite.searchEntry) {
             systemSite.searchEntry.forEach((sysEntry: SearchEntry) => {
@@ -361,6 +413,11 @@ class Config {
             _site.searchEntry = systemSite.searchEntry;
           }
 
+          // 设置默认图标
+          if (!systemSite.icon && !_site.icon) {
+            _site.icon = _site.url + "/favicon.ico"
+          }
+
           this.options.sites[index] = _site;
         }
       });
@@ -369,6 +426,8 @@ class Config {
     this.options.sites.forEach((site: Site) => {
       if (site.cdn && site.cdn.length > 0) {
         site.activeURL = site.cdn[0];
+        // 去除重复的地址，由之前的Bug引起
+        site.cdn = this.arrayUnique(site.cdn);
       } else {
         site.activeURL = site.url;
       }
@@ -402,6 +461,25 @@ class Config {
   }
 
   /**
+   * 数组去重
+   * @param source 源数组
+   * @see https://www.cnblogs.com/wisewrong/p/9642264.html （性能比较）
+   */
+  private arrayUnique(source: any[]) {
+    let result: any[] = [];
+    let obj: any = {};
+
+    source.forEach((value: any) => {
+      if (!obj[value]) {
+        result.push(value);
+        obj[value] = 1;
+      }
+    });
+
+    return result;
+  }
+
+  /**
    * 升级网站信息
    */
   public upgradeSites() {
@@ -422,9 +500,14 @@ class Config {
             console.log("upgradeSites.site", site, newHost);
             site.host = newHost;
             site.url = systemSite.url;
-            site.icon = systemSite.icon;
+            
+            // 设置默认图标
+            if (!systemSite.icon && !site.icon)
+              site.icon = site.url + "/favicon.ico"
+            else
+              site.icon = systemSite.icon;
           }
-
+          
           // 更新搜索方案
           if (this.options.searchSolutions) {
             this.options.searchSolutions.forEach(
@@ -722,22 +805,35 @@ class Config {
           },
           cookies: undefined,
           searchResultSnapshot: this.service.searchResultSnapshot.items,
-          keepUploadTask: this.service.keepUploadTask.items
+          keepUploadTask: this.service.keepUploadTask.items,
+          downloadHistory: undefined
         };
 
+        const requests: Promise<any>[] = [];
+
+        // 备份下载历史
+        requests.push(this.service.controller.downloadHistory.load());
+
         // 是否备份站点 Cookies
-        if (this.service.options.allowBackupCookies) {
-          this.getAllSiteCookies()
-            .then(result => {
-              rawData.cookies = result;
-              resolve(rawData);
-            })
-            .catch(() => {
-              resolve(rawData);
-            });
-        } else {
-          resolve(rawData);
+        if (
+          this.service.options.allowBackupCookies &&
+          PPF.checkOptionalPermission("cookies")
+        ) {
+          requests.push(this.getAllSiteCookies());
         }
+
+        Promise.all(requests)
+          .then(results => {
+            rawData.downloadHistory = results[0];
+            if (results.length > 1) {
+              rawData.cookies = results[1];
+            }
+
+            resolve(rawData);
+          })
+          .catch(() => {
+            resolve(rawData);
+          });
       } catch (error) {
         reject(error);
       }

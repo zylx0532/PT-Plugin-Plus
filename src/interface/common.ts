@@ -11,7 +11,9 @@ import {
   EBackupServerType,
   EPluginPosition,
   EWorkingStatus,
-  EEncryptMode
+  EEncryptMode,
+  ETorrentStatus,
+  ERequestType
 } from "./enum";
 
 /**
@@ -32,6 +34,7 @@ export interface DownloadClient {
   loginPwd?: string;
   paths?: any;
   autoStart?: boolean;
+  tagIMDb?: boolean;
   type?: string;
 }
 
@@ -161,6 +164,8 @@ export interface Options {
   encryptSecretKey?: string;
   // 加密方式
   encryptMode?: EEncryptMode;
+  // 允许保存搜索结果快照
+  allowSaveSnapshot?: boolean;
 }
 
 // 在搜索之前一些选项配置
@@ -256,12 +261,64 @@ export interface Site {
   offline?: boolean;
   // 是否为自定义
   isCustom?: boolean;
+  // 时区偏移量，用于解决时差问题，如：+08:00, -08:00, +0800, UTC+0800, UTC+08:00
+  // @see https://zh.wikipedia.org/wiki/各國時區列表
+  // @see https://zh.wikipedia.org/wiki/时区
+  timezoneOffset?: string;
+  // 是否合并 Schema 的标签选择器
+  mergeSchemaTagSelectors?: boolean;
+  // 消息提醒开关
+  disableMessageCount?: boolean;
+  // 等级要求
+  levelRequirements?: LevelRequirement[];
+  upLoadLimit?: number;
+}
+
+export interface LevelRequirement {
+  level?: number;
+  name?: string;
+  // 间隔要求
+  interval?: number;
+  // 日期要求
+  requiredDate?: string;
+  // 上传数要求
+  uploads?: number;
+  // 下载数要求
+  downloads?: number;
+  // 上传量要求
+  uploaded?: string | number;
+  // 下载量要求
+  downloaded?: string | number;
+  // 真实下载量
+  trueDownloaded?: string | number;
+  // 积分要求
+  bonus?: number;
+  // 做种积分要求
+  seedingPoints?: number;
+  // 做种时间要求
+  seedingTime?: number;
+  // 保种体积要求
+  seedingSize?: number;
+  // 分享率要求
+  ratio?: number;
+  // 等级积分要求
+  classPoints?: number;
+  // 独特分组要求
+  uniqueGroups?: number;
+  // “完美”FLAC要求
+  perfectFLAC?: number;
+  // 权限
+  privilege?: string;
+  // 可选要求
+  alternative?: LevelRequirement;
 }
 
 export interface Request {
   action: EAction;
   data?: any;
 }
+
+export interface IRequest extends Request {}
 
 export interface NoticeOptions {
   msg?: string;
@@ -285,9 +342,11 @@ export interface DownloadOptions {
   title?: string;
   savePath?: string;
   autoStart?: boolean;
+  tagIMDb?: boolean;
   clientId?: string;
   // 来源链接地址
   link?: string;
+  imdbId?: string;
 }
 
 /**
@@ -327,6 +386,7 @@ export interface SearchResultItemCategory {
  * 搜索返回结果
  */
 export interface SearchResultItem {
+  id?: string;
   site: Site;
   title: string;
   titleHTML?: string;
@@ -347,8 +407,9 @@ export interface SearchResultItem {
   // 进度（100表示完成）
   progress?: number;
   // 状态
-  status?: number;
+  status?: ETorrentStatus;
   host?: string;
+  imdbId?: string;
 }
 
 /**
@@ -365,41 +426,114 @@ export interface SearchEntryConfigArea {
   page?: string;
 }
 
+export interface ISearchFieldIndex {
+  // 发布时间
+  time?: number;
+  // 大小
+  size?: number;
+  // 上传数量
+  seeders?: number;
+  // 下载数量
+  leechers?: number;
+  // 完成数量
+  completed?: number;
+  // 评论数量
+  comments?: number;
+  // 发布人
+  author?: number;
+  // 分类
+  category?: number;
+  link?: number;
+  url?: number;
+  subTitle?: number;
+  title?: number;
+}
+
+/**
+ * 通用页面解析
+ */
+export interface IPageSelector {
+  // 需要请求的页面
+  page: string;
+  // 返回的数据类型，可用值：html，json ；默认为 html
+  dataType?: ERequestResultType;
+  // 用于解析数据的脚本文件路径；当指定该内容时，则执行该解析器，由解析器处理指定页面返回的内容，可用于请求多个页面等操作；
+  parser?: string;
+  // 请求方法，默认为 GET
+  requestMethod?: ERequestMethod;
+  // 数据请求头信息
+  headers?: Dictionary<any>;
+  // 需要提交的数据
+  requestData?: Dictionary<any>;
+  // 选择器列表
+  fields?: Dictionary<any>;
+  // 执行该规则的前提条件（条件表达式），合法的 js 语句；
+  prerequisites?: string;
+  // 是否合并 schema 已定义的内容，默认为 false
+  merge?: boolean;
+  // 指定用于获取内容的顶级 DOM 对象，默认为 body
+  topElement?: string;
+  // 缓存时间，单位：秒，0 及空表示不缓存
+  dataCacheTime?: number;
+}
+
 // 搜索入口默认配置
 export interface SearchEntryConfig {
   page: string;
   entry?: string;
   resultType?: ERequestResultType;
+  // don't encode the key, for some json post API. e.g. TNode
+  keepOriginKey?: boolean
+  requestDataType?: ERequestType;
   queryString?: string;
   parseScriptFile?: string;
   parseScript?: string;
   // 是否异步解析脚本
   asyncParse?: boolean;
+  // 数据表选择器
   resultSelector?: string;
   area?: SearchEntryConfigArea[];
+  // 数据请求头信息
   headers?: Dictionary<any>;
-  fieldSelector?: Dictionary<any>;
   // 跳过IMDb搜索
   skipIMDbId?: boolean;
+  // 搜索解析字段索引
+  fieldIndex?: ISearchFieldIndex;
+  // 数据字段选择器
+  fieldSelector?: Dictionary<any>;
+  // 第一行数据行
+  firstDataRowIndex?: number;
+  // 数据行选择器，默认：> tbody > tr
+  dataRowSelector?: string;
+  // 验证已登录正则表达式
+  loggedRegex?: string;
+  // 在搜索前需要处理的脚本
+  beforeSearch?: IPageSelector;
+  // 请求方法，默认为 GET
+  requestMethod?: ERequestMethod;
+  // 需要提交的数据
+  requestData?: Dictionary<any>;
 }
 
-export interface SearchEntry {
+/**
+ * 具体搜索入口配置
+ */
+export interface SearchEntry extends SearchEntryConfig {
+  // 搜索入口名称
   name?: string;
-  entry?: string;
-  resultType?: ERequestResultType;
-  parseScriptFile?: string;
-  parseScript?: string;
-  // 是否异步解析脚本
-  asyncParse?: boolean;
-  resultSelector?: string;
+  // 是否启用
   enabled?: boolean;
+  // 标签选择器配置
   tagSelectors?: any[];
+  // 是否为自定义
   isCustom?: boolean;
+  // id，自动生成
   id?: string;
-  queryString?: string;
+  // 分类目录
   categories?: string[];
+  // 追加到搜索关键字的内容
   appendToSearchKeyString?: string;
-  headers?: Dictionary<any>;
+  // 追加到查询字符串的内容
   appendQueryString?: string;
 }
 
@@ -431,22 +565,46 @@ export interface UserInfo {
   name: string;
   // 上传量
   uploaded?: number;
+  // 发布数
+  uploads?: number;
   // 下载量
   downloaded?: number;
+  // 真实下载量
+  trueDownloaded?: string | number;
+  // 下载数
+  downloads?: number;
   // 分享率
   ratio?: number;
   // 当前做种数量
   seeding?: number;
   // 做种体积
   seedingSize?: number;
+  // 做种列表
+  seedingList?: string[];
   // 当前下载数量
   leeching?: number;
   // 等级名称
   levelName?: string;
   // 魔力值/积分
   bonus?: number;
+  // 保种积分         //add by koal 220920
+  seedingPoints?: number;
+  // 做种时间要求
+  seedingTime?: number;
+  // 时魔
+  bonusPerHour?: number;
+  // 积分页面
+  bonusPage?: string;
+  // H&R未达标页面
+  unsatisfiedsPage?: string;
   // 入站时间
   joinTime?: number;
+  // 等级积分
+  classPoints?: number;
+  // H&R未达标
+  unsatisfieds?: string | number;
+  // H&R预警
+  prewarn?: number;
   // 最后更新时间
   lastUpdateTime?: number;
   // 最后更新状态
@@ -463,6 +621,12 @@ export interface UserInfo {
   lastErrorMsg?: string;
   // 消息数量
   messageCount?: number;
+  // 独特分组
+  uniqueGroups?: number;
+  // “完美”FLAC
+  perfectFLAC?: number;
+  // 下一等级
+  nextLevels?: LevelRequirement[];
   [key: string]: any;
 }
 
@@ -479,6 +643,7 @@ export interface ISearchPayload {
   doubanId?: string;
   cn?: string;
   en?: string;
+  key?: string;
 }
 
 export interface IHashData {
@@ -509,6 +674,7 @@ export interface ICollection {
   size: number;
   time?: number;
   subTitle?: string;
+  imdbId?: string;
   movieInfo?: {
     title: string;
     alt_title: string;
@@ -558,6 +724,36 @@ export const BASE_COLORS = [
   "black"
 ];
 
+/**
+ * 通用标签颜色
+ */
+export const BASE_TAG_COLORS: Dictionary<any> = {
+  // 免费下载
+  Free: "blue",
+  // 免费下载 + 2x 上传
+  "2xFree": "green",
+  // 2x 上传
+  "2xUp": "lime",
+  // 2x 上传 + 50% 下载
+  "2x50%": "light-green",
+  // 25% 下载
+  "25%": "purple",
+  // 30% 下载
+  "30%": "indigo",
+  // 35% 下载
+  "35%": "indigo darken-3",
+  // 50% 下载
+  "50%": "orange",
+  // 70% 下载
+  "70%": "blue-grey",
+  // 75% 下载
+  "75%": "lime darken-3",
+  // 仅 VIP 可下载
+  VIP: "orange darken-2",
+  // 禁止转载
+  "⛔️": "deep-orange darken-1"
+};
+
 export interface ICookies {
   host: string;
   url: string;
@@ -598,6 +794,7 @@ export interface IBackupRawData {
   cookies?: any;
   searchResultSnapshot?: any;
   keepUploadTask?: any;
+  downloadHistory?: any;
 }
 
 export interface IKeepUploadTask {
@@ -606,4 +803,10 @@ export interface IKeepUploadTask {
   title: string;
   downloadOptions: DownloadOptions;
   items: any[];
+}
+
+export interface ISiteIcon {
+  origin: string;
+  host: string;
+  data: string;
 }

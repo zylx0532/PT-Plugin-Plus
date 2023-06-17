@@ -12,7 +12,7 @@
             <v-list-tile-title>{{ item.name }}</v-list-tile-title>
             <v-list-tile-sub-title>
               <div>
-                <span class="caption">
+                <span class="caption mr-2">
                   <span>{{ item.time | formatDate }}</span>
                   <span class="mx-2">{{ item.size | formatSize }}</span>
                 </span>
@@ -99,14 +99,16 @@ export default Vue.extend({
         }
       });
 
-      menus.push({});
+      if (PPF.checkOptionalPermission("cookies")) {
+        menus.push({});
 
-      menus.push({
-        title: this.$t("settings.backup.restoreCookies"),
-        fn: () => {
-          this.$emit("download", this.server, item, ERestoreContent.cookies);
-        }
-      });
+        menus.push({
+          title: this.$t("settings.backup.restoreCookies"),
+          fn: () => {
+            this.$emit("download", this.server, item, ERestoreContent.cookies);
+          }
+        });
+      }
 
       menus.push({});
 
@@ -132,6 +134,20 @@ export default Vue.extend({
             this.server,
             item,
             ERestoreContent.keepUploadTask
+          );
+        }
+      });
+
+      menus.push({});
+
+      menus.push({
+        title: this.$t("settings.backup.restoreDownloadHistory"),
+        fn: () => {
+          this.$emit(
+            "download",
+            this.server,
+            item,
+            ERestoreContent.downloadHistory
           );
         }
       });

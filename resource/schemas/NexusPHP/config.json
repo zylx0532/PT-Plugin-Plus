@@ -41,28 +41,25 @@
   },
   "torrentTagSelectors": [{
     "name": "Free",
-    "selector": "img.pro_free, .free_bg, font.free",
-    "color": "blue"
+    "selector": "img.pro_free, .free_bg, font.free"
   }, {
     "name": "2xFree",
-    "selector": "img.pro_free2up, .twoupfree_bg, font.twoupfree",
-    "color": "green"
+    "selector": "img.pro_free2up, .twoupfree_bg, font.twoupfree"
   }, {
     "name": "2xUp",
-    "selector": "img.pro_2up, .twoup_bg, font.twoup",
-    "color": "lime"
+    "selector": "img.pro_2up, .twoup_bg, font.twoup"
   }, {
     "name": "2x50%",
-    "selector": "img.pro_50pctdown2up, .twouphalfdown_bg, font.twouphalfdown",
-    "color": "light-green"
+    "selector": "img.pro_50pctdown2up, .twouphalfdown_bg, font.twouphalfdown"
   }, {
     "name": "30%",
-    "selector": "img.pro_30pctdown, .thirtypercentdown_bg, font.thirtypercent",
-    "color": "indigo"
+    "selector": "img.pro_30pctdown, .thirtypercentdown_bg, font.thirtypercent"
   }, {
     "name": "50%",
-    "selector": "img.pro_50pctdown, .halfdown_bg, font.halfdown",
-    "color": "orange"
+    "selector": "img.pro_50pctdown, .halfdown_bg, font.halfdown"
+  }, {
+    "name": "⛔️",
+    "selector": "span.tags.tjz, span.tag.tag-dz, span.tag.tag-limited"
   }],
   "selectors": {
     "userBaseInfo": {
@@ -78,7 +75,7 @@
           "filters": ["query && query.attr('href').getQueryString('id') > 0 ? query.text(): ''"]
         },
         "isLogged": {
-          "selector": ["a[href*='logout.php']"],
+          "selector": ["a[href*='usercp.php']"],
           "filters": ["query.length>0"]
         },
         "messageCount": {
@@ -91,11 +88,11 @@
       "page": "/userdetails.php?id=$user.id$",
       "fields": {
         "uploaded": {
-          "selector": ["td.rowfollow:contains('分享率')", "td.rowhead:contains('传输') + td", "td.rowhead:contains('Transfers') + td"],
+          "selector": ["td.rowhead:contains('传输') + td", "td.rowhead:contains('傳送') + td", "td.rowhead:contains('Transfers') + td", "td.rowfollow:contains('分享率')"],
           "filters": ["query.text().replace(/,/g,'').match(/(上[传傳]量|Uploaded).+?([\\d.]+ ?[ZEPTGMK]?i?B)/)", "(query && query.length==3)?(query[2]).sizeToNumber():0"]
         },
         "downloaded": {
-          "selector": ["td.rowfollow:contains('分享率')", "td.rowhead:contains('传输') + td", "td.rowhead:contains('Transfers') + td"],
+          "selector": ["td.rowhead:contains('传输') + td", "td.rowhead:contains('傳送') + td", "td.rowhead:contains('Transfers') + td", "td.rowfollow:contains('分享率')"],
           "filters": ["query.text().replace(/,/g,'').match(/(下[载載]量|Downloaded).+?([\\d.]+ ?[ZEPTGMK]?i?B)/)", "(query && query.length==3)?(query[2]).sizeToNumber():0"]
         },
         "levelName": {
@@ -103,12 +100,29 @@
           "filters": ["query.next().find('img').attr('title')"]
         },
         "bonus": {
-          "selector": ["td.rowhead:contains('魔力') + td", "td.rowhead:contains('Karma'):contains('Points') + td", "td.rowhead:contains('麦粒') + td", "td.rowfollow:contains('魔力值')"],
-          "filters": ["query.is(\":contains('魔力值:')\")?query.text().replace(/,/g,'').match(/魔力值.+?([\\d.]+)/)[1]:query.text().replace(/,/g,'')", "parseFloat(query)"]
+          "selector": ["td.rowhead:contains('魔力') + td", "td.rowhead:contains('Karma'):contains('Points') + td", "td.rowhead:contains('麦粒') + td", "td.rowfollow:contains('魔力值')", "td.rowhead:contains('bonus') + td"],
+          "filters": ["query.is(\":contains('魔力值:')\")||query.is(\":contains('Bonus Points:')\")?query.text().replace(/,/g,'').match(/(?:魔力值|Bonus Points).+?([\\d.]+)/)[1]:query.text().replace(/,/g,'')", "parseFloat(query)"]
+        },
+        "seedingPoints": {
+          "selector": ["td.rowhead:contains('做种积分') + td", "td.rowhead:contains('Seeding Points') + td", "td.rowhead:contains('做種積分') + td", "td.rowhead:contains('保种积分') + td", "td.rowfollow:contains('做种积分')", "td.rowfollow:contains('Seeding Points')", "td.rowfollow:contains('做種積分')"],
+          "filters": [
+            "query.text().replace(/,/g,'')",
+            "query.includes('做种积分') || query.includes('做種積分') || query.includes('Seeding Points') ? query.match(/(做种积分|做種積分|Seeding Points).+?[\\d.]+/g)[0] : query",
+            "query ? parseFloat(query.match(/[\\d.]+/)[0]) : null"]
         },
         "joinTime": {
           "selector": ["td.rowhead:contains('加入日期')", "td.rowhead:contains('Join'):contains('date')"],
-          "filters": ["query.next().text().split(' (')[0]", "dateTime(query).isValid()?dateTime(query).valueOf():query"]
+          "filters": ["query.next().text().split(' (')[0].trim()", "dateTime(query).isValid()?dateTime(query).valueOf():query"]
+        }
+      }
+    },
+    "bonusExtendInfo": {
+      "prerequisites": "!user.bonusPerHour",
+      "page": "/mybonus.php",
+      "fields": {
+        "bonusPerHour": {
+          "selector": ["div:contains('你当前每小时能获取'):last", "div:contains('You are currently getting'):last", "div:contains('你當前每小時能獲取'):last"],
+          "filters": ["parseFloat(query.text().match(/[\\d.]+/)[0])"]
         }
       }
     },
@@ -118,11 +132,11 @@
       "fields": {
         "seeding": {
           "selector": ["tr:not(:eq(0))"],
-          "filters": ["query.find('td.rowfollow:eq(2)').length"]
+          "filters": ["query.find('td.rowfollow:eq(2)').length != 0 ? query.find('td.rowfollow:eq(2)').length : query.length"]
         },
         "seedingSize": {
           "selector": ["tr:not(:eq(0))"],
-          "filters": ["jQuery.map(query.find('td.rowfollow:eq(2)'), (item)=>{return $(item).text();})", "_self.getTotalSize(query)"]
+          "filters": ["query.find('td.rowfollow:eq(2)').length != 0 ? jQuery.map(query.find('td.rowfollow:eq(2)'), (item)=>{return $(item).text();}) : jQuery.map(query.find('td:eq(2)'), (item)=>{return $(item).text();})", "_self.getTotalSize(query)"]
         }
       }
     },
@@ -136,6 +150,22 @@
           "selector": ["a[href*='www.imdb.com/title/']:first"],
           "attribute": "href",
           "filters": ["query.match(/(tt\\d+)/)", "(query && query.length>=2)?query[1]:null"]
+        },
+        "sayThanksButton": {
+          "selector": ["input#saythanks:not(:disabled)"],
+          "filters": ["query"]
+        }
+      }
+    },
+    "/plugin_details.php": {
+      "fields": {
+        "size": {
+          "selector": ["td.rowtitle:contains('大小：'):first"],
+          "filters": ["query.next().text()", "(query && query.length>1)?query.sizeToNumber():0"]
+        },
+        "sayThanksButton": {
+          "selector": ["input#saythanks:not(:disabled)"],
+          "filters": ["query"]
         }
       }
     }

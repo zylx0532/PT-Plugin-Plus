@@ -1,6 +1,6 @@
 <template>
   <div>
-    <v-card class="mb-5" color="grey lighten-4">
+    <v-card class="mb-5" :color="$vuetify.dark ? '' : 'grey lighten-4'">
       <v-card-text>
         <v-form v-model="valid">
           <!-- 类型 -->
@@ -128,7 +128,7 @@ export default Vue.extend({
         require: [(v: any) => !!v || "!"],
         url: (v: any) => {
           return (
-            /^(https?):\/\/[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|]$/.test(
+            /^(https?):\/\/[-A-Za-z0-9+&@#/%?=~_|!:,.;\[\]]+[-A-Za-z0-9+&@#/%=~_|]$/.test(
               v
             ) || this.$t("settings.backup.server.owss.addressTip")
           );
@@ -190,10 +190,12 @@ export default Vue.extend({
     },
     option: {
       handler() {
-        this.$emit("change", {
-          data: this.option,
-          valid: this.valid
-        });
+        setTimeout(() => {
+          this.$emit("change", {
+            data: this.option,
+            valid: this.valid
+          });
+        }, 100);
       },
       deep: true
     },
@@ -206,7 +208,15 @@ export default Vue.extend({
         if (this.initData.digest === undefined) {
           this.initData.digest = false;
         }
-        this.option = Object.assign(this.option, this.initData);
+        this.option = Object.assign({
+          authCode: "",
+          address: "",
+          name: "",
+          loginName: "",
+          loginPwd: "",
+          type: EBackupServerType.OWSS,
+          digest: false
+        }, this.initData);
         this.option.type = this.type;
       }
     }

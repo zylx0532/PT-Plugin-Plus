@@ -1,6 +1,7 @@
 interface IFilter {
   formatNumber: (source: number, format?: string) => string;
   formatSize: (bytes: any, zeroToEmpty?: boolean, type?: string) => string;
+  formatSizeWithNegative: (bytes: any, zeroToEmpty?: boolean, type?: string) => string;
   formatSpeed: (bytes: any, zeroToEmpty: boolean) => string;
   parseURL: (
     url: string
@@ -18,6 +19,8 @@ interface IFilter {
   };
   timeAgoToNumber: (source: string) => number;
   [key: string]: any;
+  formatInteger:(source: number) => string;
+  formatIMDbId:(source: string) => string;
 }
 
 /**
@@ -135,7 +138,7 @@ export const filters: IFilter = {
 
   /**
    *
-   * @param bytes 需要格式的字节
+   * @param sourceBytes 需要格式的字节
    * @param zeroToEmpty 是否需要将0转为空输出，默认为 false
    * @param type 类型，可指定为 `speed` 为速度，会在后面加上 /s
    */
@@ -154,7 +157,7 @@ export const filters: IFilter = {
     }
 
     if (bytes === 0) {
-      if (zeroToEmpty === true) {
+      if (zeroToEmpty) {
         return "";
       } else {
         if (type === "speed") {
@@ -166,6 +169,8 @@ export const filters: IFilter = {
     }
     let r: number;
     let u = "KiB";
+    let format = '###,###,###,###.00 ';
+    let format2 = '###,###,###,###.000 ';
     if (bytes < 1000 * Math.pow(2, 10)) {
       r = bytes / Math.pow(2, 10);
       u = "KiB";
@@ -178,22 +183,46 @@ export const filters: IFilter = {
     } else if (bytes < 1000 * Math.pow(2, 40)) {
       r = bytes / Math.pow(2, 40);
       u = "TiB";
+      format = format2;
     } else if (bytes < 1000 * Math.pow(2, 50)) {
       r = bytes / Math.pow(2, 50);
       u = "PiB";
+      format = format2;
     } else if (bytes < 1000 * Math.pow(2, 60)) {
       r = bytes / Math.pow(2, 60);
       u = "EiB";
+      format = format2;
     } else {
       r = bytes / Math.pow(2, 70);
       u = "ZiB";
+      format = format2;
     }
 
     if (type === "speed") {
       u += "/s";
     }
 
-    return this.formatNumber(r, "###,###,###,###.00 ") + u;
+    return this.formatNumber(r, format) + u;
+  },
+
+  /**
+   * 支持负值
+   */
+  formatSizeWithNegative(
+    sourceBytes: any,
+    zeroToEmpty: boolean = false,
+    type: string = ""
+  ): string {
+    sourceBytes = parseFloat(sourceBytes)
+    let bytes = sourceBytes
+    if (sourceBytes < 0) {
+      bytes = - bytes
+    }
+    let result = this.formatSize(bytes, zeroToEmpty, type)
+    if (sourceBytes < 0) {
+      result = `- ${result}`
+    }
+    return result
   },
 
   /**
@@ -259,6 +288,20 @@ export const filters: IFilter = {
       origin: `${a.protocol}//${a.hostname}` + (a.port ? `:${a.port}` : "")
     };
   },
+  /**
+   * 将数字转为正确的IMDbId
+   * @param source
+   */
+  formatIMDbId(imdbId: string): string {
+    if (Number(imdbId))
+    {
+      if (imdbId.length < 7)
+        imdbId = imdbId.padStart(7, '0');
+      
+      imdbId = "tt" + imdbId;
+    }
+    return imdbId;
+  },
 
   /**
    * 将多少时间之前的格式转为时间数字（大概时间）
@@ -316,5 +359,8 @@ export const filters: IFilter = {
     }
 
     return result.getTime();
-  }
+  },
+  formatInteger(source: number) : string {
+    return this.formatNumber(source, "###,###,###,###")
+  },
 };

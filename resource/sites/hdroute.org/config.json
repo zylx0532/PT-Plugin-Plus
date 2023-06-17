@@ -1,5 +1,6 @@
 {
   "name": "HDRoute",
+  "timezoneOffset": "+0800",
   "description": "HDRoute",
   "url": "http://hdroute.org/",
   "icon": "http://hdroute.org/favicon.ico",
@@ -38,8 +39,7 @@
   }],
   "torrentTagSelectors": [{
     "name": "Free",
-    "selector": "figure.sprite_dlp000",
-    "color": "blue"
+    "selector": "figure.sprite_dlp000"
   }, {
     "name": "~Free",
     "selector": "figure.sprite_tempo_free",
@@ -47,16 +47,13 @@
     "color": "teal"
   }, {
     "name": "30%",
-    "selector": "figure.sprite_dlp030",
-    "color": "indigo"
+    "selector": "figure.sprite_dlp030"
   }, {
     "name": "50%",
-    "selector": "figure.sprite_dlp050",
-    "color": "orange"
+    "selector": "figure.sprite_dlp050"
   }, {
     "name": "70%",
-    "selector": "figure.sprite_dlp070",
-    "color": "blue-grey"
+    "selector": "figure.sprite_dlp070"
   }],
   "selectors": {
     "userBaseInfo": {
@@ -101,6 +98,16 @@
         "seedingSize": {
           "selector": [".header-user-data a[href*='list_seeding.php']"],
           "filters": ["query.next().text().match(/([\\d.]+ ?[ZEPTGMK]?i?B)/)", "(query && query.length==2)?(query[1]).sizeToNumber():0"]
+        }
+      }
+    },
+    "userSeedingTorrents": {
+      "page": "/api.php?action=getAllPeeringInfo",
+      "dataType": "json",
+      "fields": {
+        "seedingList": {
+          "selector": ["seeding"],
+          "filters": ["let r=[];query.forEach(q=>{r.push(q.torrentid)});r"]
         }
       }
     }

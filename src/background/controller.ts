@@ -12,7 +12,6 @@ import {
   Request,
   EModule,
   ERequestMethod,
-  UserInfo,
   EUserDataRange,
   i18nResource,
   IBackupServer,
@@ -52,13 +51,16 @@ export default class Controller {
 
   public contentPages: any[] = [];
 
+  public debuggerTabId: number | undefined = 0;
+  public debuggerPort: chrome.runtime.Port | undefined;
+
   private imageBase64Cache: Dictionary<any> = {};
   // 下载重试次数
   private downloadFailedRetriesCache: Dictionary<any> = {};
   // 种子链接对应的名称缓存
   private torrentInfosCache: Dictionary<any> = {};
 
-  constructor(public service: Service) {}
+  constructor(public service: Service) { }
 
   public init(options: Options) {
     this.reset(options);
@@ -155,6 +157,13 @@ export default class Controller {
   }
 
   /**
+   * 重置下载历史
+   */
+  public resetDownloadHistory(datas: any): Promise<any> {
+    return this.downloadHistory.reset(datas);
+  }
+
+  /**
    * 发送下载信息到指定的客户端
    * @param data
    */
@@ -205,7 +214,10 @@ export default class Controller {
       host = site.host + "";
       let siteDefaultPath = this.getSiteDefaultPath(site);
       let siteClientConfig = this.siteDefaultClients[host];
-      if (siteDefaultPath) {
+
+      // https://github.com/pt-plugins/PT-Plugin-Plus/issues/681
+      // 在 downloadOptions 中已经有 savePath 的情况下，不覆盖 savePath
+      if (!downloadOptions.savePath && siteDefaultPath) {
         downloadOptions.savePath = siteDefaultPath;
       }
       if (!siteClientConfig) {
@@ -243,6 +255,10 @@ export default class Controller {
     downloadOptions: DownloadOptions,
     host: string = ""
   ): Promise<any> {
+    // copy from sendTorrentToDefaultClient
+    let URL = Filters.parseURL(downloadOptions.url);
+    let downloadHost = URL.host;
+    let siteConfig = this.getSiteFromHost(downloadHost);
     return new Promise((resolve?: any, reject?: any) => {
       clientConfig.client
         .call(EAction.addTorrentFromURL, {
@@ -251,7 +267,9 @@ export default class Controller {
           autoStart:
             downloadOptions.autoStart === undefined
               ? false
-              : downloadOptions.autoStart
+              : downloadOptions.autoStart,
+          imdbId: downloadOptions.tagIMDb ? downloadOptions.imdbId : null,
+          upLoadLimit: siteConfig !== undefined ? siteConfig.upLoadLimit : null,
         })
         .then((result: any) => {
           this.service.logger.add({
@@ -453,8 +471,7 @@ export default class Controller {
    */
   public getSiteFromHost(host: string): Site {
     return this.options.sites.find((item: Site) => {
-      let cdn = item.cdn || [];
-      item.url && cdn.push(item.url);
+      let cdn = [item.url].concat(item.cdn);
       return item.host == host || cdn.join("").indexOf(host) > -1;
     });
   }
@@ -501,13 +518,13 @@ export default class Controller {
         type: EDataResultType.success,
         msg:
           this.service.i18n.t("service.controller.torrentAdded", {
-            name: downloadOptions.title
+            title: downloadOptions.title
           }) +
           (downloadOptions.savePath
             ? this.service.i18n.t("service.controller.torrentSavePath", {
-                path: downloadOptions.savePath,
-                interpolation: { escapeValue: false }
-              })
+              path: downloadOptions.savePath,
+              interpolation: { escapeValue: false }
+            })
             : ""), //`${downloadOptions.title || ""} 种子已添加完成。` +
         // (downloadOptions.savePath
         //   ? `<br/>保存至 ${downloadOptions.savePath}`
@@ -716,7 +733,7 @@ export default class Controller {
     }
 
     if (this.optionsTabId == 0) {
-      this.createOptionTab(url);
+      this.openURL(url);
     } else {
       chrome.tabs.get(this.optionsTabId as number, tab => {
         if (!chrome.runtime.lastError && tab) {
@@ -725,7 +742,7 @@ export default class Controller {
             url: "index.html#" + url
           });
         } else {
-          this.createOptionTab(url);
+          this.openURL(url);
         }
       });
     }
@@ -735,7 +752,7 @@ export default class Controller {
    * 创建配置页面选项卡
    * @param url
    */
-  private createOptionTab(url: string = "") {
+  public openURL(url: string = "") {
     if (!url) {
       return;
     }
@@ -915,7 +932,8 @@ export default class Controller {
               if (options.parseTorrent) {
                 resolve({
                   url,
-                  torrent
+                  torrent,
+                  content: file.content
                 });
               } else {
                 resolve(file.content);
@@ -1123,7 +1141,7 @@ export default class Controller {
           }
 
           items.forEach(item => {
-            chrome.downloads.download(item, function(downloadId) {
+            chrome.downloads.download(item, function (downloadId) {
               console.log(downloadId);
             });
           });
@@ -1299,6 +1317,10 @@ export default class Controller {
     return this.service.config.getFavicons();
   }
 
+  public resetFavicon(url: string): Promise<any> {
+    return this.service.config.getFavicon(url, true);
+  }
+
   public getBackupRawData(): Promise<any> {
     return this.service.config.getBackupRawData();
   }
@@ -1357,5 +1379,41 @@ export default class Controller {
 
   public updateKeepUploadTask(options: any): Promise<any> {
     return this.service.keepUploadTask.update(options);
+  }
+
+  public updateDebuggerTabId(id: number): Promise<any> {
+    return new Promise<any>((resolve?: any, reject?: any) => {
+      this.debuggerTabId = id;
+      this.debuggerPort = chrome.tabs.connect(id, {
+        name: EModule.debugger
+      });
+      resolve();
+    });
+  }
+
+  public pushDebugMsg(msg: any): Promise<any> {
+    return new Promise<any>((resolve?: any, reject?: any) => {
+      console.log(msg);
+      if (this.debuggerTabId) {
+        chrome.tabs.get(this.debuggerTabId, (tab: chrome.tabs.Tab) => {
+          if (tab && this.debuggerPort) {
+            this.debuggerPort.postMessage({
+              action: EAction.pushDebugMsg,
+              data: msg
+            });
+          }
+          if (chrome.runtime.lastError) {
+            console.log(chrome.runtime.lastError.message);
+            this.debuggerTabId = 0;
+            this.debuggerPort = undefined;
+          }
+        });
+      }
+      resolve();
+    });
+  }
+
+  public getTopSearches(count: number = 9): Promise<any> {
+    return this.movieInfoService.getTopSearches(count);
   }
 }

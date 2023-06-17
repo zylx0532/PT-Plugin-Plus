@@ -1,5 +1,6 @@
 {
   "name": "HDU",
+  "timezoneOffset": "+0800",
   "description": "HDU",
   "url": "https://pt.hdupt.com/",
   "icon": "https://pt.hdupt.com/favicon.ico",
@@ -9,6 +10,19 @@
   ],
   "schema": "NexusPHP",
   "host": "pt.hdupt.com",
+  "searchEntryConfig": {
+    "merge": true,
+    "fieldSelector": {
+      "progress": {
+        "selector": ["td[class='embedded'][style*='color: blue;font-weight: bold'],td[class='embedded'] img[src*='zuozhong.gif']"],
+        "filters": ["query.attr('src')?100:(query.text()?query.text():null)"]
+      },
+      "status": {
+        "selector": ["td[class='embedded'][style*='color: blue;font-weight: bold'],td[class='embedded'] img[src*='zuozhong.gif']"],
+        "filters": ["query.attr('src')?2:(query.text()=='100%'?255:3)"]
+      }
+    }
+  },
   "searchEntry": [{
       "name": "全站",
       "enabled": true
@@ -115,7 +129,7 @@
       "fields": {
         "bonus": {
           "selector": ["td.rowhead:contains('魔力值') + td"],
-          "filters": ["query.text().replace(/,/g,'').match(/\\(([\\d.]+)/)", "(query && query.length>=2)?parseFloat(query[1]):0"]
+          "filters": ["query.is(\":contains('魔力值:')\")?query.text().replace(/,/g,'').match(/魔力值.+?([\\d.]+)/)[1]:query.text().replace(/,/g,'')", "parseFloat(query)"]
         }
       }
     }

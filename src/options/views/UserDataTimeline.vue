@@ -36,7 +36,7 @@
           >
             <v-icon>close</v-icon>
           </v-btn>
-          <v-progress-circular indeterminate :width="3" size="30" color="green" v-if="shareing"></v-progress-circular>
+          <v-progress-circular indeterminate :width="3" size="30" color="green" v-if="shareing" class="by_pass_canvas"></v-progress-circular>
         </v-card-actions>
 
         <v-card-title primary-title>
@@ -64,7 +64,7 @@
             <v-timeline-item v-for="(site, i) in datas" :key="i" color="transparent" large>
               <template v-slot:icon>
                 <v-avatar size="38">
-                  <img :src="site.icon">
+                  <img v-if="site.icon" :src="site.icon" :class="{'icon-blur': blurSiteIcon}"/>
                 </v-avatar>
               </template>
               <template v-slot:opposite>
@@ -72,16 +72,18 @@
                 <div class="caption">
                   <span v-if="showUserName" class="mr-2">{{ site.user.name }}</span>
                   <span v-if="showUserLevel">&lt;{{ site.user.levelName }}&gt;</span>
+                  <span v-if="site.user.id && site.user.id.length > 0 && showUid">&lt;{{ site.user.id }}&gt;</span>
                 </div>
               </template>
               <div>
                 <v-divider v-if="i>0" class="mb-2"></v-divider>
                 <div class="headline font-weight-light mb-2" v-if="showSiteName">{{ site.name }}</div>
-                <div>{{ $t('timeline.user.uploaded') }}{{ site.user.uploaded | formatSize }}</div>
+                <div>{{ $t('timeline.user.uploaded') }}{{ site.user.uploaded | formatSize}}</div>
                 <div>{{ $t('timeline.user.downloaded') }}{{ site.user.downloaded | formatSize }}</div>
                 <div>{{ $t('timeline.user.ratio') }}{{ site.user.ratio | formatRatio }}</div>
                 <div>{{ $t('timeline.user.seedingSize') }}{{ site.user.seedingSize | formatSize }} ({{ site.user.seeding }})</div>
                 <div>{{ $t('timeline.user.bonus') }}{{ site.user.bonus | formatNumber }}</div>
+                <div v-if="site.user.bonusPerHour && site.user.bonusPerHour != 'N/A'">{{ $t('timeline.user.bonusPerHour') }}{{ site.user.bonusPerHour | formatNumber }}</div>
               </div>
             </v-timeline-item>
           </v-timeline>
@@ -103,6 +105,12 @@
         class="my-0"
       ></v-switch>
       <v-switch
+          color="success"
+          v-model="blurSiteIcon"
+          :label="$t('timeline.blurSiteIcon')"
+          class="my-0"
+      ></v-switch>
+      <v-switch
         color="success"
         v-model="showUserName"
         :label="$t('timeline.userName')"
@@ -114,15 +122,38 @@
         :label="$t('timeline.userLevel')"
         class="my-0"
       ></v-switch>
+      <v-switch
+        color="success"
+        v-model="showUid"
+        :label="$t('timeline.userId')"
+        class="my-0"
+      ></v-switch>
+      <v-divider />
+      <h1 style="padding: 5px;">{{ $t('timeline.showSites') }}</h1>
+      <v-layout justify-start row wrap>
+        <v-flex v-for="(site, i) in sites" :key="i" xs3>
+          <v-switch
+                  color="success"
+                  v-model="showSites"
+                  :label="site.name"
+                  :value="site.name"
+                  class="my-0"
+                  :disabled="!site.allowGetUserInfo"
+                  @change="formatData"
+          ></v-switch>
+        </v-flex>
+      </v-layout>
     </div>
   </div>
 </template>
 <script lang="ts">
 import Vue from "vue";
 import { Site, Dictionary, EAction, Options } from "@/interface/common";
-import html2canvas from "html2canvas";
 import FileSaver from "file-saver";
+import domtoimage from 'dom-to-image';
 import Extension from "@/service/extension";
+import dayjs from "dayjs";
+import { PPF } from "@/service/public";
 
 const extension = new Extension();
 
@@ -132,12 +163,13 @@ export default Vue.extend({
       shareMessage: this.$t("timeline.shareMessage").toString(),
       displayUserName: "",
       sites: [] as Site[],
+      showSites: [] as string[],
       infos: {
         nameInfo: { name: "test", maxCount: 0 },
         joinTimeInfo: {
           site: {} as Site,
           time: new Date().getTime(),
-          years: 0
+          years: 0 as number | string
         },
         maxUploadedInfo: {
           site: {} as Site,
@@ -161,8 +193,10 @@ export default Vue.extend({
       shareTime: new Date(),
       shareing: false,
       showUserName: true,
-      showSiteName: true,
+      showSiteName: false,
       showUserLevel: true,
+      showUid: true,
+      blurSiteIcon: true,
       iconCache: {} as Dictionary<any>
     };
   },
@@ -189,6 +223,9 @@ export default Vue.extend({
           if (this.options.displayUserName) {
             this.displayUserName = this.options.displayUserName;
           }
+          this.showSites = this.sites
+                  .filter((site: Site) => {return site.allowGetUserInfo})
+                  .map((site: Site) => {return site.name});  //  只提取站点名称
           this.formatData();
         })
         .catch();
@@ -206,11 +243,20 @@ export default Vue.extend({
 
       let sites: Site[] = [];
       this.sites.forEach((site: Site) => {
+        // 站点设置不获取用户信息
         if (!site.allowGetUserInfo) {
           return;
         }
+
+        // 展示时不显示该站点信息
+        if (!this.showSites.includes(site.name)) {
+          return;
+        }
+ 
         let user = site.user;
         if (user && user.name && user.joinTime) {
+          user.joinTime = PPF.transformTime(user.joinTime, site.timezoneOffset);  //add by pxwang for gpw jointime error
+          
           sites.push(site);
           if (!userNames[user.name]) {
             userNames[user.name] = 0;
@@ -254,21 +300,22 @@ export default Vue.extend({
               result.maxSeedingInfo.site = site;
             }
           }
-
           user.ratio = this.getRatio(user);
         }
       });
 
       if (result.joinTimeInfo.time > 0) {
-        let now = new Date();
-        result.joinTimeInfo.years =
-          now.getFullYear() - new Date(result.joinTimeInfo.time).getFullYear();
+        // 计算P龄，带小数
+        result.joinTimeInfo.years = dayjs(new Date())
+          .diff(result.joinTimeInfo.time, "year", true)
+          .toFixed(2);
       }
 
       this.infos = result;
 
       // 按加入时间排序
       this.datas = sites.sort((a, b) => {
+        
         if (!a.user || !b.user) {
           return 0;
         }
@@ -305,18 +352,24 @@ export default Vue.extend({
       return JSON.parse(JSON.stringify(source));
     },
     share() {
-      let div = this.$refs.userDataCard as HTMLDivElement;
       this.shareing = true;
       this.shareTime = new Date();
       this.formatData();
       setTimeout(() => {
-        html2canvas(div, {}).then(canvas => {
-          canvas.toBlob((blob: any) => {
-            if (blob) {
-              FileSaver.saveAs(blob, "PT-Plugin-Plus-UserData.png");
+        let div = this.$refs.userDataCard as HTMLDivElement;
+        domtoimage.toBlob(div, {
+          filter: (node) => {
+            if (node.nodeType === 1) {
+              return !(node as Element).classList.contains('by_pass_canvas')
             }
-            this.shareing = false;
-          });
+
+            return true
+          }
+        }).then((blob: any) => {
+          if (blob) {
+            FileSaver.saveAs(blob, "PT-Plugin-Plus-UserData.png");
+          }
+          this.shareing = false;
         });
       }, 500);
     },
@@ -405,6 +458,10 @@ export default Vue.extend({
     position: absolute;
     left: 660px;
     top: 0;
+  }
+
+  .icon-blur {
+    filter: blur(4px);
   }
 }
 </style>

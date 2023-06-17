@@ -1,30 +1,41 @@
 <template>
   <div class="site-search-entry">
-    <v-alert
-      :value="true"
-      type="info"
-    >{{ $t('settings.siteSearchEntry.index.title') }} [{{ site.name }}]</v-alert>
+    <v-alert :value="true" type="info"
+      >{{ $t("settings.siteSearchEntry.index.title") }} [{{
+        site.name
+      }}]</v-alert
+    >
     <v-card>
       <v-card-title>
         <v-btn color="success" @click="add">
           <v-icon class="mr-2">add</v-icon>
-          {{$t('common.add')}}
+          {{ $t("common.add") }}
         </v-btn>
-        <v-btn color="error" :disabled="selected.length==0" @click="removeSelected">
+        <v-btn
+          color="error"
+          :disabled="selected.length == 0"
+          @click="removeSelected"
+        >
           <v-icon class="mr-2">remove</v-icon>
-          {{$t('common.remove')}}
+          {{ $t("common.remove") }}
         </v-btn>
         <v-btn
           color="info"
-          href="https://github.com/ronggang/PT-Plugin-Plus/wiki/search-entry-definition"
+          href="https://github.com/pt-plugins/PT-Plugin-Plus/wiki/search-entry-definition"
           target="_blank"
           rel="noopener noreferrer nofollow"
         >
           <v-icon class="mr-2">help</v-icon>
-          {{ $t('settings.siteSearchEntry.index.help') }}
+          {{ $t("settings.siteSearchEntry.index.help") }}
         </v-btn>
         <v-spacer></v-spacer>
-        <v-text-field class="search" append-icon="search" label="Search" single-line hide-details></v-text-field>
+        <v-text-field
+          class="search"
+          append-icon="search"
+          label="Search"
+          single-line
+          hide-details
+        ></v-text-field>
       </v-card-title>
       <v-data-table
         v-model="selected"
@@ -36,8 +47,13 @@
         class="elevation-1"
       >
         <template slot="items" slot-scope="props">
-          <td style="width:20px;">
-            <v-checkbox v-model="props.selected" primary hide-details v-if="props.item.isCustom"></v-checkbox>
+          <td style="width: 20px">
+            <v-checkbox
+              v-model="props.selected"
+              primary
+              hide-details
+              v-if="props.item.isCustom"
+            ></v-checkbox>
           </td>
           <td>
             <a @click="edit(props.item)">
@@ -54,14 +70,15 @@
                 small
                 class="mr-2 pl-0"
                 disabled
-              >{{ item }}</v-chip>
+                >{{ item }}</v-chip
+              >
             </template>
           </td>
           <td>
             <v-switch
               true-value="true"
               false-value="false"
-              :input-value="props.item.enabled?'true':'false'"
+              :input-value="props.item.enabled ? 'true' : 'false'"
               hide-details
             ></v-switch>
           </td>
@@ -71,50 +88,60 @@
               class="mr-2"
               @click="copy(props.item)"
               :title="$t('common.copy')"
-            >file_copy</v-icon>
+              >file_copy</v-icon
+            >
             <v-icon
               small
               class="mr-2"
               @click="edit(props.item)"
               v-if="props.item.isCustom"
               :title="$t('common.edit')"
-            >edit</v-icon>
+              >edit</v-icon
+            >
             <v-icon
               small
               color="error"
               @click="removeConfirm(props.item)"
               v-if="props.item.isCustom"
               :title="$t('common.remove')"
-            >delete</v-icon>
+              >delete</v-icon
+            >
           </td>
         </template>
       </v-data-table>
     </v-card>
 
     <!-- 新增 -->
-    <AddItem v-model="showAddDialog" @save="addItem" :site="site"/>
+    <AddItem v-model="showAddDialog" @save="addItem" :site="site" />
     <!-- 编辑 -->
-    <EditItem v-model="showEditDialog" :site="site" :data="selectedItem" @save="updateItem"/>
+    <EditItem
+      v-model="showEditDialog"
+      :site="site"
+      :data="selectedItem"
+      @save="updateItem"
+    />
 
     <v-dialog v-model="dialogRemoveConfirm" width="300">
       <v-card>
-        <v-card-title
-          class="headline red lighten-2"
-        >{{ $t('settings.siteSearchEntry.index.removeTitle') }}</v-card-title>
+        <v-card-title class="headline red lighten-2">{{
+          $t("settings.siteSearchEntry.index.removeTitle")
+        }}</v-card-title>
 
-        <v-card-text>{{ $t('settings.siteSearchEntry.index.removeConfirm') }}</v-card-text>
+        <v-card-text>{{
+          $t("settings.siteSearchEntry.index.removeConfirm")
+        }}</v-card-text>
 
         <v-divider></v-divider>
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn flat color="info" @click="dialogRemoveConfirm=false">
+          <v-btn flat color="info" @click="dialogRemoveConfirm = false">
             <v-icon>cancel</v-icon>
-            <span class="ml-1">{{ $t('common.cancel') }}</span>
+            <span class="ml-1">{{ $t("common.cancel") }}</span>
           </v-btn>
           <v-btn color="error" flat @click="remove">
             <v-icon>check_circle_outline</v-icon>
-            <span class="ml-1">{{ $t('common.ok') }}</span>
+            <span class="ml-1">{{ $t("common.ok") }}</span>
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -134,6 +161,7 @@ import AddItem from "./Add.vue";
 import EditItem from "./Edit.vue";
 
 import { filters } from "@/service/filters";
+import { PPF } from "@/service/public";
 export default Vue.extend({
   components: {
     AddItem,
@@ -219,16 +247,17 @@ export default Vue.extend({
       this.reloadEntry(this.site.host);
     },
     reloadEntry(host: string | undefined) {
-      this.site = this.$store.state.options.sites.find((item: Site) => {
+      let site = this.$store.state.options.sites.find((item: Site) => {
         return item.host == host;
       });
 
-      if (this.site) {
+      if (site) {
+        this.site = PPF.clone(site);
         let systemSite = this.options.system.sites.find((item: Site) => {
           return item.host == host;
         });
         if (systemSite) {
-          this.site.categories = systemSite.categories;
+          this.site.categories = PPF.clone(systemSite.categories);
         }
         let searchEntry: any[] = [];
 
@@ -248,7 +277,7 @@ export default Vue.extend({
           }
         }
 
-        this.searchEntry = searchEntry;
+        this.searchEntry = PPF.clone(searchEntry);
       }
     },
     getCategory(entry: SearchEntry): string[] {

@@ -7,6 +7,11 @@ import { UAParser } from "ua-parser-js";
 class HelpFunctions {
   public isExtensionMode: boolean = false;
   public browserName: string = "";
+  public manifest: chrome.runtime.Manifest = {
+    manifest_version: 2,
+    name: "",
+    version: ""
+  };
   constructor() {
     try {
       this.isExtensionMode = !!(
@@ -14,6 +19,8 @@ class HelpFunctions {
         chrome.extension &&
         chrome.runtime.getManifest
       );
+
+      this.manifest = chrome.runtime.getManifest();
     } catch (error) {
       console.log("HelpFunctions: is not extension mode.", error);
     }
@@ -66,8 +73,7 @@ class HelpFunctions {
    */
   public getVersion() {
     if (this.isExtensionMode) {
-      const manifest = chrome.runtime.getManifest();
-      return "v" + (manifest.version_name || manifest.version);
+      return "v" + (this.manifest.version_name || this.manifest.version);
     } else {
       return "localVersion";
     }
@@ -116,7 +122,7 @@ class HelpFunctions {
     options = Object.assign(
       {
         type: "basic",
-        iconUrl: chrome.extension.getURL("/assets/icon-128.png"),
+        iconUrl: chrome.runtime.getURL("/assets/icon-128.png"),
         title: "PT 助手 Plus",
         priority: 0,
         message: ""
@@ -366,9 +372,8 @@ class HelpFunctions {
     }
 
     let site = sites.find((item: Site) => {
-      let cdn = item.cdn || [];
-      item.url && cdn.push(item.url);
-      return item.host == host || cdn.join("").indexOf(host) > -1;
+      let cdn = [item.url].concat(item.cdn, item.formerHosts?.map(x => `//${x}`));
+      return item.host == host || cdn.join("").indexOf(`//${host}`) > -1;
     });
 
     if (site) {
@@ -394,7 +399,7 @@ class HelpFunctions {
     maps: Dictionary<any>,
     prefix: string = ""
   ): string {
-    if (!source) {
+    if (!source || typeof source !== 'string') {
       return source;
     }
     let result: string = source;
@@ -409,6 +414,45 @@ class HelpFunctions {
         result = result.replace(search, value);
       }
     }
+    return result;
+  }
+
+  /**
+   * 检查指定的可选权限是否有被声明
+   * @param key
+   */
+  public checkOptionalPermission(key: string): boolean {
+    if (
+      this.isExtensionMode &&
+      this.manifest &&
+      this.manifest.optional_permissions
+    ) {
+      return this.manifest.optional_permissions.includes(key);
+    }
+
+    return false;
+  }
+
+  /**
+   * 转换时间
+   * @param time 待转换的时间
+   * @param timezoneOffset 时区偏移量，用于解决时差问题，如：+08:00, -08:00, +0800, UTC+0800, UTC+08:00
+   * @see https://zh.wikipedia.org/wiki/各國時區列表
+   * @see https://zh.wikipedia.org/wiki/时区
+   * @see https://zh.wikipedia.org/wiki/ISO_8601
+   */
+  public transformTime(time?: number, timezoneOffset?: string) {
+    if (!timezoneOffset || !time) {
+      return time;
+    }
+    let result = time;
+    // 标准时间戳需要 * 1000
+    if (/^(\d){10}$/.test(result + "")) {
+      result = parseInt(result + "") * 1000;
+    }
+    // 时间格式按 ISO 8601 标准设置，如：2020-01-01T00:00:01+0800
+    let datetime = dayjs(result).format("YYYY-MM-DDTHH:mm:ss");
+    result = new Date(`${datetime}${timezoneOffset}`).getTime();
     return result;
   }
 }

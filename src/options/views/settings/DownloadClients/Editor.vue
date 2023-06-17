@@ -1,6 +1,6 @@
 <template>
   <div>
-    <v-card class="mb-5" color="grey lighten-4">
+    <v-card class="mb-5" :color="$vuetify.dark ? '' : 'grey lighten-4'">
       <v-card-text>
         <v-form v-model="option.valid">
           <v-text-field
@@ -38,6 +38,12 @@
             :label="$t('settings.downloadClients.editor.autoStart')"
             v-model="option.autoStart"
             v-if="['transmission', 'qbittorrent'].includes(option.type)"
+          ></v-switch>
+
+          <v-switch
+            :label="$t('settings.downloadClients.editor.tagIMDb')"
+            v-model="option.tagIMDb"
+            v-if="['qbittorrent'].includes(option.type)"
           ></v-switch>
 
           <v-text-field
@@ -93,7 +99,7 @@ export default Vue.extend({
         require: [(v: any) => !!v || "!"],
         url: (v: any) => {
           return (
-            /^(https?):\/\/[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|]$/.test(
+            /^(https?):\/\/[-A-Za-z0-9+&@#/%?=~_|!:,.;\[\]]+[-A-Za-z0-9+&@#/%=~_|]$/.test(
               v
             ) || this.$t("settings.downloadClients.editor.addressTip")
           );

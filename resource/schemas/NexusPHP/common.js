@@ -65,10 +65,15 @@
       // 添加复制下载链接按钮
       this.addCopyTextToClipboardButton();
 
+      // 初始化可用空间按钮
       this.initFreeSpaceButton();
 
       // 初始化收藏按钮
       this.initCollectionButton();
+
+      // 初始化说谢谢按钮
+      this.initSayThanksButton();
+      if(document.domain.match("keepfrds.com")){$(".pt-plugin-body").css("z-index","39")}
     }
 
     /**
@@ -282,7 +287,9 @@
           title: option.title,
           savePath: savePath,
           autoStart: this.defaultClientOptions.autoStart,
-          link: option.link
+          tagIMDb: this.defaultClientOptions.tagIMDb,
+          link: option.link,
+          imdbId: option.imdbId
         })
           .then(result => {
             console.log("命令执行完成", result);
@@ -499,7 +506,8 @@
             {
               url,
               title,
-              link: this.currentURL
+              link: this.currentURL,
+              imdbId: this.getIMDbId ? this.getIMDbId() : null
             },
             event.originalEvent,
             success,
@@ -530,7 +538,7 @@
            * 两个事件必需执行一个，可以传递一个参数
            */
           click: (success, error) => {
-            // getDownloadURL 方法有继承者提供
+            // getDownloadURL 方法由继承者提供
             if (!this.getDownloadURL) {
               // "getDownloadURL 方法未定义"
               error(this.t("getDownloadURLisUndefined"));
@@ -556,7 +564,8 @@
             this.sendTorrentToDefaultClient({
               url,
               title,
-              link: this.currentURL
+              link: this.currentURL,
+              imdbId: this.getIMDbId ? this.getIMDbId() : null
             })
               .then(() => {
                 success();
@@ -832,7 +841,9 @@
                   title: options.title,
                   savePath: item.path,
                   autoStart: item.client.autoStart,
-                  link: options.link
+                  tagIMDb: item.client.tagIMDb,
+                  link: options.link,
+                  imdbId: options.imdbId
                 })
                   .then(result => {
                     success();
@@ -1018,7 +1029,8 @@
             clientId: downloadOptions.client.id,
             url,
             savePath,
-            autoStart: downloadOptions.client.autoStart
+            autoStart: downloadOptions.client.autoStart,
+            tagIMDb: downloadOptions.client.tagIMDb
           });
         } else {
           items.push({
@@ -1086,7 +1098,9 @@
             url: url,
             title: "",
             savePath: downloadOptions.path,
-            autoStart: downloadOptions.client.autoStart
+            autoStart: downloadOptions.client.autoStart,
+            tagIMDb: downloadOptions.client.tagIMDb,
+            imdbId: downloadOptions.imdbId
           },
           false
         )
@@ -1210,6 +1224,9 @@
      * @param {string} url
      */
     getFullURL(url) {
+      if (!url) {
+        return "";
+      }
       if (url.substr(0, 2) === "//") {
         url = `${location.protocol}${url}`;
       } else if (url.substr(0, 1) === "/") {
@@ -1218,6 +1235,30 @@
         url = `${location.origin}/${url}`;
       }
       return url;
+    }
+
+    /**
+     * 初始化说谢谢按钮
+     */
+    initSayThanksButton() {
+      let sayThanksButton = PTService.getFieldValue("sayThanksButton");
+      console.log("sayThanksButton");
+      if (sayThanksButton && sayThanksButton.length) {
+        // 说谢谢
+        PTService.addButton({
+          title: this.t("buttons.sayThanksTip"),
+          icon: "thumb_up",
+          label: this.t("buttons.sayThanks"),
+          key: "sayThanks",
+          click: (success, error) => {
+            sayThanksButton.click();
+            success();
+            setTimeout(() => {
+              PTService.removeButton("sayThanks");
+            }, 1000);
+          }
+        });
+      }
     }
   }
 

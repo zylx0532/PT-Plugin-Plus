@@ -62,12 +62,22 @@
           <td style="width:20px;">
             <v-checkbox v-model="props.selected" primary hide-details></v-checkbox>
           </td>
-          <td>
-            <a @click="edit(props.item)">
-              <v-avatar size="18">
+          <td class="text-xs-center pb-1">
+            <v-btn
+              flat
+              icon
+              :title="$t('settings.sites.index.resetFavicons')"
+              @click.stop="resetFavicon(props.item)"
+              :loading="loadingIconSites.includes(props.item.host)"
+              class="siteIcon"
+            >
+              <v-avatar :size="18" v-if="!loadingIconSites.includes(props.item.host)">
                 <img :src="props.item.icon" />
               </v-avatar>
-              <span class="ml-2">{{ props.item.name }}</span>
+            </v-btn>
+            <br />
+            <a @click="edit(props.item)">
+              <span>{{ props.item.name }}</span>
             </a>
           </td>
           <td>{{ props.item.tags && props.item.tags.join(", ") }}</td>
@@ -77,6 +87,7 @@
               false-value="false"
               :input-value="props.item.allowSearch?'true':'false'"
               hide-details
+              :disabled="props.item.offline"
               @click.stop="updateSearchStatus(props.item)"
             ></v-switch>
           </td>
@@ -86,10 +97,11 @@
               false-value="false"
               :input-value="props.item.allowGetUserInfo?'true':'false'"
               hide-details
+              :disabled="props.item.offline"
               @click.stop="updateAllowGetUserInfo(props.item)"
             ></v-switch>
           </td>
-          <!-- <td>
+          <td>
             <v-switch
               true-value="true"
               false-value="false"
@@ -97,7 +109,7 @@
               hide-details
               @click.stop="updateOfflineStatus(props.item)"
             ></v-switch>
-          </td>-->
+          </td>
           <td>
             <a
               :href="props.item.activeURL"
@@ -113,6 +125,13 @@
               @click="editPlugins(props.item)"
               :title="$t('settings.sites.index.plugins')"
             >assistant</v-icon>
+            <v-icon
+                v-if="props.item.allowGetUserInfo"
+                small
+                class="ml-2"
+                @click="editUserInfo(props.item)"
+                :title="$t('settings.sites.index.showUserInfo')"
+            >view_list</v-icon>
             <v-icon
               small
               class="ml-2"
@@ -142,6 +161,7 @@
     <AddSite v-model="showAddDialog" @save="addSite" />
     <!-- 编辑站点 -->
     <EditSite v-model="showEditDialog" :site="selectedSite" @save="updateSite" />
+    <UserInfo v-model="showUserInfo" :site="selectedSite"></UserInfo>
 
     <v-dialog v-model="dialogRemoveConfirm" width="300">
       <v-card>
@@ -194,6 +214,7 @@ import {
 } from "@/interface/common";
 import AddSite from "./Add.vue";
 import EditSite from "./Edit.vue";
+import UserInfo from "./UserInfo.vue";
 
 import { filters } from "@/service/filters";
 import Extension from "@/service/extension";
@@ -205,7 +226,8 @@ const extension = new Extension();
 export default Vue.extend({
   components: {
     AddSite,
-    EditSite
+    EditSite,
+    UserInfo
   },
   data() {
     return {
@@ -215,6 +237,7 @@ export default Vue.extend({
       },
       showAddDialog: false,
       showEditDialog: false,
+      showUserInfo: false,
       siteDuplicate: false,
       sites: [] as Site[],
       selectedSite: {},
@@ -228,7 +251,8 @@ export default Vue.extend({
       haveError: false,
       haveSuccess: false,
       successMsg: "",
-      faviconReseting: false
+      faviconReseting: false,
+      loadingIconSites: [] as string[]
     };
   },
   methods: {
@@ -243,6 +267,16 @@ export default Vue.extend({
       if (index !== -1) {
         this.selectedSite = this.$store.state.options.sites[index];
         this.showEditDialog = true;
+      }
+    },
+    editUserInfo(item: any) {
+      let index = this.$store.state.options.sites.findIndex((site: any) => {
+        return item.name === site.name;
+      });
+
+      if (index !== -1) {
+        this.selectedSite = this.$store.state.options.sites[index];
+        this.showUserInfo = true;
       }
     },
     removeConfirm(item: any) {
@@ -617,6 +651,33 @@ export default Vue.extend({
         .finally(() => {
           this.faviconReseting = false;
         });
+    },
+
+    resetFavicon(site: Site) {
+      if (!site.host) {
+        return;
+      }
+      const host = site.host;
+      if (!this.loadingIconSites.includes(host)) {
+        this.loadingIconSites.push(host);
+      }
+
+      extension
+        .sendRequest(EAction.resetFavicon, null, site.activeURL || site.url)
+        .then(options => {
+          // 重新加载配置信息
+          this.$store.commit("readConfig");
+        })
+        .catch(error => {
+          console.log(error);
+        })
+        .finally(() => {
+          let index = this.loadingIconSites.indexOf(host);
+          console.log("host: %s, index: %s", host, index);
+          if (index != -1) {
+            this.loadingIconSites.splice(index, 1);
+          }
+        });
     }
   },
   created() {
@@ -633,7 +694,6 @@ export default Vue.extend({
         msg: "系统配置网站信息丢失"
       });
     }
-    // this.sites = this.$store.state.options.sites;
   },
   mounted() {
     this.fileImport = this.$refs.fileImport;
@@ -647,8 +707,9 @@ export default Vue.extend({
       return [
         {
           text: this.$t("settings.sites.index.headers.name"),
-          align: "left",
-          value: "name"
+          align: "center",
+          value: "name",
+          width: "110px"
         },
         {
           text: this.$t("settings.sites.index.headers.tags"),
@@ -665,11 +726,11 @@ export default Vue.extend({
           align: "left",
           value: "allowGetUserInfo"
         },
-        // {
-        //   text: this.$t("settings.sites.index.headers.offline"),
-        //   align: "left",
-        //   value: "offline"
-        // },
+        {
+          text: this.$t("settings.sites.index.headers.offline"),
+          align: "left",
+          value: "offline"
+        },
         {
           text: this.$t("settings.sites.index.headers.activeURL"),
           align: "left",
@@ -698,6 +759,13 @@ export default Vue.extend({
 .set-sites {
   .search {
     max-width: 400px;
+  }
+
+  .siteIcon {
+    margin: 0;
+    margin-top: 5px;
+    height: 30px;
+    width: 30px;
   }
 }
 </style>

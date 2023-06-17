@@ -11,25 +11,32 @@
      */
     initButtons() {
       this.initDetailButtons();
-
-      let sayThanksButton = $("input#saythanks:not(:disabled)");
-      if (sayThanksButton.length) {
-        // 说谢谢
-        PTService.addButton({
-          title: this.t("buttons.sayThanksTip"), // "对当前种子说谢谢",
-          icon: "thumb_up",
-          label: this.t("buttons.sayThanks"), //"感谢发布者",
-          key: "sayThanks",
-          click: (success, error) => {
-            sayThanksButton.click();
-            success();
-            setTimeout(() => {
-              PTService.removeButton("sayThanks");
-            }, 1000);
-          }
-        });
-      }
     }
+
+    /**
+     * 通过尝试分析 href 获取真正下载链接
+     */
+
+    _getDownloadUrlByPossibleHrefs() {
+      const possibleHrefs = [
+        // pthome
+        "a[href*='downhash'][href*='https'][class!='forward_a']",
+        // hdchina
+        "a[href*='hash'][href*='https'][class!='forward_a']",
+        // misc
+        "a[href*='passkey'][href*='https'][class!='forward_a']",
+        "a[href*='passkey'][class!='forward_a']"
+      ];
+
+      for (const href of possibleHrefs) {
+        const query = $(href);
+        if (query.length) {
+          return query.attr("href");
+        }
+      }
+      return null;
+    }
+
 
     /**
      * 获取下载链接
@@ -37,15 +44,8 @@
     getDownloadURL() {
       let url = PTService.getFieldValue("downloadURL");
       if (!url) {
-        let query = $("a[href*='passkey'][href*='https']");
-        if (query.length > 0) {
-          url = query.attr("href");
-        } else {
-          query = $("a[href*='passkey']");
-          if (query.length > 0) {
-            url = query.attr("href");
-          }
-        }
+
+        url = this._getDownloadUrlByPossibleHrefs();
 
         if (!url) {
           url =
@@ -76,13 +76,7 @@
         }
       }
 
-      url = this.getFullURL(url);
-
-      if (url.indexOf("https=1") === -1) {
-        url += "&https=1";
-      }
-
-      return url;
+      return this.getFullURL(url);
     }
 
     /**
@@ -95,6 +89,31 @@
         return datas[1] || title;
       }
       return title;
+    }
+    
+    /**
+     * 获取当前种子IMDb Id
+     */
+    getIMDbId() {
+      try
+      {
+        let imdbId = PTService.getFieldValue("imdbId");
+        console.log(imdbId);
+        if (imdbId)
+          return imdbId;
+        else {
+          const link = $("a[href*='www.imdb.com/title/']:first");
+          if (link.length > 0) {
+            let match = link.attr("href").match(/(tt\d+)/);
+
+            if (match && match.length >= 2)
+              return imdbId = match[1];
+
+          }
+        }
+      } catch {
+      }
+      return null;
     }
   }
   new App().init();

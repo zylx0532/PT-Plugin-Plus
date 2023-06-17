@@ -1,11 +1,11 @@
 {
 	"name": "__MSG_manifest_appName__",
 	"short_name": "__MSG_manifest_shortName__",
-	"version": "1.4.2",
+	"version": "1.6.1",
 	"description": "__MSG_manifest_appDescription__",
 	"manifest_version": 2,
 	"default_locale": "zh_CN",
-	"homepage_url": "https://github.com/ronggang/PT-Plugin-Plus",
+	"homepage_url": "https://github.com/pt-plugins/PT-Plugin-Plus",
 	"browser_action": {
 		"default_icon": "assets/icon-19.png",
 		"default_title": "__MSG_manifest_appName__"
@@ -21,7 +21,7 @@
 		"https://*/*",
 		"unlimitedStorage"
 	],
-	"optional_permissions": ["tabs", "downloads", "cookies"],
+	"optional_permissions": ["downloads", "cookies"],
 	"icons": {
 		"16": "assets/icon.png",
 		"19": "assets/icon-19.png",
@@ -46,6 +46,9 @@
 			"http://*/*",
 			"https://*/*"
 		],
+		"exclude_matches": [
+			"https://fonts.google.com/*"
+		],
 		"css": [
 			"assets/base.css",
 			"libs/materialIcons/content_style.css",
@@ -59,6 +62,7 @@
 			"libs/Base64.js",
 			"libs/notice/notice.js",
 			"libs/basicContext/basicContext.min.js",
+			"libs/drag.js",
 			"js/content/libs.js",
 			"js/content/content.js"
 		]
@@ -71,5 +75,11 @@
 	],
 	"omnibox": {
 		"keyword": "pt"
+	},
+	"minimum_chrome_version": "64.0.3242",
+	"browser_specific_settings": {
+		"gecko": {
+			"update_url": "https://pt-plugins.github.io/PT-Plugin-Plus/update/firefox.json"
+		}
 	}
 }

@@ -1,6 +1,11 @@
 import localStorage from "./localStorage";
 import md5 from "blueimp-md5";
-import { EConfigKey, DataResult, EDataResultType } from "@/interface/common";
+import {
+  EConfigKey,
+  DataResult,
+  EDataResultType,
+  EInstallType
+} from "@/interface/common";
 import { PPF } from "./public";
 import "./favicon";
 
@@ -38,7 +43,7 @@ let RESOURCE_API = {
   siteConfig: `${RESOURCE_URL}/sites/{$site}/config.json`,
   clients: `${RESOURCE_URL}/clients.json`,
   clientConfig: `${RESOURCE_URL}/clients/{$client}/config.json`,
-  latestReleases: `https://api.github.com/repos/ronggang/PT-Plugin-Plus/releases/latest`,
+  latestReleases: `https://api.github.com/repos/pt-plugins/PT-Plugin-Plus/releases/latest`,
   systemConfig: `${RESOURCE_URL}/systemConfig.json`
 };
 
@@ -146,19 +151,40 @@ export const APP = {
             }
 
             let content = this.cache.get(url);
-            if (content) {
-              this.runScript(content);
-              resolve();
-            } else {
-              $.get(
-                url,
-                result => {
-                  this.runScript(result);
-                  this.cache.set(url, result);
-                  resolve();
-                },
-                "text"
-              );
+            try {
+              if (content) {
+                this.runScript(content);
+                resolve();
+              } else {
+                console.log("execScript: %s", url);
+                $.ajax({
+                  url,
+                  dataType: "text"
+                })
+                  .done(result => {
+                    this.runScript(result);
+                    this.cache.set(url, result);
+                    resolve();
+                  })
+                  .fail((jqXHR, status, text) => {
+                    if (
+                      jqXHR.responseJSON &&
+                      jqXHR.responseJSON.code &&
+                      jqXHR.responseJSON.msg
+                    ) {
+                      reject(
+                        jqXHR.responseJSON.msg +
+                        " (" +
+                        jqXHR.responseJSON.code +
+                        ")"
+                      );
+                    } else {
+                      reject(status + ", " + text);
+                    }
+                  });
+              }
+            } catch (error) {
+              reject(error);
             }
           }
 
@@ -271,7 +297,15 @@ export const APP = {
     return new Promise<any>((resolve?: any, reject?: any) => {
       if (chrome && chrome.management) {
         chrome.management.getSelf(result => {
-          resolve(result.installType);
+          // 判断是否为 crx 方式
+          if (
+            result.updateUrl &&
+            result.updateUrl.indexOf("pt-plugins/PT-Plugin-Plus") > 0
+          ) {
+            resolve(EInstallType.crx);
+          } else {
+            resolve(result.installType);
+          }
         });
       } else {
         reject();

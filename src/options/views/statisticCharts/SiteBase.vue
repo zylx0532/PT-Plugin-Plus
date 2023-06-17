@@ -31,18 +31,29 @@
       </template>
     </v-autocomplete>
 
-    <v-layout row wrap>
+    <v-layout row wrap class="mb-2">
       <v-btn depressed small to="/home">{{ $t('statistic.goback') }}</v-btn>
       <v-btn depressed small @click.stop="exportRawData">{{ $t('statistic.exportRawData') }}</v-btn>
-      <v-spacer></v-spacer>
+
+      <v-spacer>
+        <v-btn-toggle v-model="dateRange" class="ml-5">
+          <v-btn flat value="7day" v-text="$t('statistic.dateRange.7day')"></v-btn>
+          <v-btn flat value="30day" v-text="$t('statistic.dateRange.30day')"></v-btn>
+          <v-btn flat value="60day" v-text="$t('statistic.dateRange.60day')"></v-btn>
+          <v-btn flat value="90day" v-text="$t('statistic.dateRange.90day')"></v-btn>
+          <v-btn flat value="180day" v-text="$t('statistic.dateRange.180day')"></v-btn>
+          <v-btn flat value="all" v-text="$t('statistic.dateRange.all')"></v-btn>
+        </v-btn-toggle>
+      </v-spacer>
       <v-btn flat icon small @click="share" :title="$t('statistic.share')" v-if="!shareing">
         <v-icon small>share</v-icon>
       </v-btn>
-      <v-progress-circular indeterminate :width="3" size="30" color="green" v-if="shareing"></v-progress-circular>
+      <v-progress-circular indeterminate :width="3" size="30" color="green" v-if="shareing" class="by_pass_canvas"></v-progress-circular>
     </v-layout>
 
-    <div ref="charts">
-      <highcharts :options="chartBaseData" />
+    <div ref="charts" class="charts">
+      <highcharts :options="chartBarData" />
+      <highcharts :options="chartBaseData" class="mt-4" />
       <highcharts :options="chartExtData" class="mt-4" />
 
       <v-card-actions>
@@ -73,10 +84,10 @@ import {
   Dictionary,
   ECommonKey
 } from "@/interface/common";
-import html2canvas from "html2canvas";
 import FileSaver from "file-saver";
 import { PPF } from "@/service/public";
 import dayjs from "dayjs";
+import domtoimage from "dom-to-image";
 
 const extension = new Extension();
 
@@ -127,6 +138,7 @@ export default Vue.extend({
     return {
       chartBaseData: {},
       chartExtData: {},
+      chartBarData: {},
       host: "",
       options: this.$store.state.options,
       selectedSite: {} as Site,
@@ -135,7 +147,10 @@ export default Vue.extend({
       version: "",
       userName: "",
       sites: [] as Site[],
-      rawData: {} as Dictionary<any>
+      rawData: {} as Dictionary<any>,
+      beginDate: "",
+      endDate: "",
+      dateRange: "30day"
     };
   },
 
@@ -175,6 +190,8 @@ export default Vue.extend({
         return item.host == this.host;
       });
 
+      this.resetDateRange();
+
       extension
         .sendRequest(EAction.getUserHistoryData, null, this.host)
         .then((data: any) => {
@@ -211,7 +228,12 @@ export default Vue.extend({
             if (siteData.hasOwnProperty(date)) {
               const data = siteData[date];
 
-              if (data.lastUpdateStatus != EDataResultType.success) {
+              if (
+                !data.uploaded &&
+                !data.downloaded &&
+                !data.seedingSize &&
+                !data.seeding
+              ) {
                 continue;
               }
 
@@ -224,7 +246,7 @@ export default Vue.extend({
                   seeding: 0,
                   bonus: 0,
                   name: "",
-                  lastUpdateStatus: EDataResultType.success
+                  lastUpdateStatus: EDataResultType.success,
                 };
               }
 
@@ -268,6 +290,43 @@ export default Vue.extend({
 
       return datas;
     },
+    //-> { site: [ { date, relativeUploaded }] }
+    getRelativeData(source: any) {
+      const result: any = {};
+      for (const [host, siteData] of Object.entries(source)) {
+        const site: Site = this.options.sites.find((item: Site) => item.host == host);
+        if (!site) {
+          continue;
+        }
+        if (!site.allowGetUserInfo) {
+          continue;
+        }
+        const newSiteData = this.fillData(siteData);
+
+        // -> [ { date, uploaded }]
+        const absoluteSiteData = [];
+        for (const [date, item] of (Object.entries(newSiteData) as any[])) {
+          if (date == EUserDataRange.latest) {
+            continue;
+          }
+          absoluteSiteData.push({
+            date: new Date(date),
+            uploaded: item.uploaded,
+          });
+        }
+
+        //-> [ { date, relativeUploaded }]
+        const relativeSiteData = [];
+        for (let i=1; i<absoluteSiteData.length; i++) {
+          const a = absoluteSiteData[i-1];
+          const b = absoluteSiteData[i];
+          relativeSiteData.push({ date: a.date, relativeUploaded: b.uploaded - a.uploaded });
+        }
+
+        result[site.name] = relativeSiteData;
+      }
+      return result;
+    },
     getNumber(source: any) {
       if (typeof source === "string") {
         source = source.replace(/,/g, "");
@@ -282,17 +341,24 @@ export default Vue.extend({
     /**
      * 填充数据，将两个日期中间空白的数据由前一天数据填充
      */
-    fillData(result: any) {
+    fillData(result: any, fill: boolean = true) {
       let datas: any = {};
       let lastDate: any = null;
       let lastData: any = null;
       for (const key in result) {
         if (dayjs(key).isValid()) {
           let data = result[key];
+          let isValidDate = true;
+
           // 如果当前数据不可用，则使用上一条数据
-          if (!data.isLogged || data.lastUpdateStatus != "success") {
+          if (
+            !data.uploaded &&
+            !data.downloaded &&
+            !data.seedingSize &&
+            !data.seeding
+          ) {
             data = lastData;
-          } else if (lastData && data.id != lastData.id) {
+          } else if (lastData && !data.id && !data.name) {
             data = lastData;
           }
 
@@ -310,18 +376,24 @@ export default Vue.extend({
             lastData = PPF.clone(data);
           }
 
-          let day = date.diff(lastDate, "day");
-          if (day > 1) {
-            for (let index = 0; index < day - 1; index++) {
-              lastDate = lastDate.add(1, "day");
-              datas[lastDate.format("YYYY-MM-DD")] = lastData;
+          if (fill) {
+            let day = date.diff(lastDate, "day");
+            if (day > 1) {
+              for (let index = 0; index < day - 1; index++) {
+                lastDate = lastDate.add(1, "day");
+                if (this.inDateRange(lastDate)) {
+                  datas[lastDate.format("YYYY-MM-DD")] = lastData;
+                }
+              }
             }
           }
 
-          datas[key] = data;
-
           lastData = PPF.clone(data);
           lastDate = date;
+
+          if (this.inDateRange(date)) {
+            datas[key] = data;
+          }
         }
       }
 
@@ -329,20 +401,37 @@ export default Vue.extend({
 
       return datas;
     },
+    inDateRange(date: any) {
+      // 小于起始日期时跳过
+      if (
+        dayjs(this.beginDate).isValid() &&
+        date.diff(this.beginDate, "day") < 0
+      ) {
+        return false;
+      }
+
+      // 大于截止日期时跳过
+      if (dayjs(this.endDate).isValid() && date.diff(this.endDate, "day") > 0) {
+        return false;
+      }
+
+      return true;
+    },
     resetData(result: any) {
       if (this.host) {
-        result = this.fillData(result);
-        this.resetBaseData(result);
-        this.resetExtData(result);
+        const newResult = this.fillData(result, false);
+        this.resetBaseData(newResult);
+        this.resetExtData(newResult);
+        this.resetBarData(this.getRelativeData({[this.host]: result}));
       } else {
         let data = this.getTotalData(result);
-        console.log(data);
         this.selectedSite = {
           name: this.$t("statistic.allSite").toString(),
           host: ECommonKey.allSite
         };
         this.resetBaseData(data);
         this.resetExtData(data);
+        this.resetBarData(this.getRelativeData(result));
       }
     },
     /**
@@ -400,7 +489,7 @@ export default Vue.extend({
         if (result.hasOwnProperty(date)) {
           const data = result[date];
 
-          if (data.lastUpdateStatus != EDataResultType.success) {
+          if (!data.uploaded && !data.downloaded) {
             continue;
           }
           if (date == EUserDataRange.latest) {
@@ -418,6 +507,9 @@ export default Vue.extend({
       }
 
       var chart = {
+        chart: {
+          backgroundColor: null
+        },
         series: datas,
         colors: colors,
         // 版权信息
@@ -567,10 +659,7 @@ export default Vue.extend({
         if (result.hasOwnProperty(date)) {
           const data = result[date];
 
-          if (
-            data.lastUpdateStatus != EDataResultType.success ||
-            data.seeding == null
-          ) {
+          if (!data.seedingSize && !data.seeding) {
             continue;
           }
           if (date == EUserDataRange.latest) {
@@ -588,6 +677,9 @@ export default Vue.extend({
 
       let _self = this;
       var chart = {
+        chart: {
+          backgroundColor: null
+        },
         series: datas,
         colors: colors,
         // 版权信息
@@ -698,6 +790,108 @@ export default Vue.extend({
 
       this.chartExtData = chart;
     },
+    /**
+     * Bar数据
+     */
+    resetBarData(result: any) {
+      const $t = this.$t.bind(this);
+
+      // -> [ { name: siteName, data: [ [ date, relativeUploaded ] ]}]
+      const series = Object.entries(result).map(([siteName, data]: any[]) => ({
+        name: siteName,
+        data: data.map((v: any) => ([
+          v.date.getTime(),
+          v.relativeUploaded,
+        ]))
+      }));
+
+      const chart = {
+        series,
+        chart: {
+          backgroundColor: null,
+          type: 'column'
+        },
+        credits: {
+          enabled: false
+        },
+        title: {
+          text: this.$t("statistic.barDataTitle", {
+            userName: this.userName,
+            site: this.selectedSite.name
+          }).toString()
+        },
+        xAxis: {
+          type: "datetime",
+          dateTimeLabelFormats: {
+            day: "%m-%d",
+            week: "%m-%d",
+            month: "%m-%d",
+            year: "%m-%d"
+          },
+          gridLineDashStyle: "ShortDash",
+          gridLineWidth: 1,
+          gridLineColor: "#dddddd"
+        },
+        yAxis: {
+          title: {
+            text: this.$t("statistic.data").toString(),
+          },
+          lineWidth: 1,
+          gridLineDashStyle: "ShortDash"
+        },
+        tooltip: {
+          useHTML: true,
+          formatter: function(): any {
+            const { x, y, total, color, series: { name: siteName } }: any = this
+            let sites = []
+            for (const site of series) {
+              const siteY = (site.data.find(([a]: any[]) => a === x) || [0, 0])[1]
+              if (
+                (y < 0 && siteY < 0) ||
+                (y > 0 && siteY > 0)
+               ) {
+                const percentage = Math.ceil(siteY / total * 100)
+                sites.push({
+                  name: site.name,
+                  value: siteY,
+                  valueDisplay: filters.formatSizeWithNegative(siteY),
+                  percentageDisplay: `${percentage}%`,
+                  isActive: site.name === siteName,
+                })
+              }
+            }
+            sites.sort((a,b) => b.value-a.value)
+            const date = dayjs(x).format("YYYY-MM-DD")
+            const totalDisplay = filters.formatSizeWithNegative(total)
+            const totalText = $t('statistic.total').toString()
+
+            const createTr = ({ name, valueDisplay, percentageDisplay, isActive }: any) => {
+              return `
+                <tr style='color: ${isActive ? color : "inherit"};'>
+                  <td>${name}</td>
+                  <td style='padding-left: 5px;'>${valueDisplay}</td>
+                  <td style='padding-left: 5px;'>${percentageDisplay}</td>
+                </tr>
+              `
+            }
+
+            return `
+              ${date}<br/>
+              <table>
+                ${createTr({ name: totalText, valueDisplay: totalDisplay, percentageDisplay: '100%' })}
+                ${sites.map(createTr).join('')}
+              </table>
+            `
+          },
+        },
+        plotOptions: {
+          column: {
+            stacking: 'normal',
+          }
+        },
+      };
+      this.chartBarData = chart;
+    },
     joinTags(tags: any): string {
       if (tags && tags.join) {
         return tags.join(", ");
@@ -708,13 +902,18 @@ export default Vue.extend({
       let div = this.$refs.charts as HTMLDivElement;
       this.shareing = true;
       this.shareTime = new Date();
-      html2canvas(div, {}).then(canvas => {
-        canvas.toBlob((blob: any) => {
-          if (blob) {
-            FileSaver.saveAs(blob, "PT-Plugin-Plus-Statistic.png");
+      domtoimage.toJpeg(div, {
+        filter: (node) => {
+          if (node.nodeType === 1) {
+            return !(node as Element).classList.contains('by_pass_canvas')
           }
-          this.shareing = false;
-        });
+          return true
+        }
+      }).then((dataUrl: any) => {
+        if (dataUrl) {
+          FileSaver.saveAs(dataUrl, "PT-Plugin-Plus-UserData.jpg");
+        }
+        this.shareing = false;
       });
     },
     /**
@@ -728,6 +927,43 @@ export default Vue.extend({
         data,
         `PT-Plugin-Plus-Statistic-${this.selectedSite.host}.json`
       );
+    },
+
+    resetDateRange() {
+      const now = dayjs();
+      this.endDate = now.toString();
+      switch (this.dateRange) {
+        case "7day":
+          this.beginDate = now.add(-7, "day").toString();
+          break;
+
+        case "30day":
+          this.beginDate = now.add(-30, "day").toString();
+          break;
+
+        case "60day":
+          this.beginDate = now.add(-60, "day").toString();
+          break;
+
+        case "90day":
+          this.beginDate = now.add(-90, "day").toString();
+          break;
+
+        case "180day":
+          this.beginDate = now.add(-180, "day").toString();
+          break;
+
+        default:
+          this.beginDate = "";
+          break;
+      }
+    }
+  },
+
+  watch: {
+    dateRange() {
+      this.resetDateRange();
+      this.resetData(this.rawData);
     }
   }
 });
@@ -737,11 +973,21 @@ export default Vue.extend({
   width: 900px;
   padding: 0;
 
+  .charts {
+    background-color: white;
+  }
+
   .chart {
     min-width: 320px;
     max-width: 800px;
     height: 240px;
     margin: 0 auto;
+  }
+}
+
+.theme--dark .container {
+  .charts {
+    background-color: #9e9e9e;
   }
 }
 </style>

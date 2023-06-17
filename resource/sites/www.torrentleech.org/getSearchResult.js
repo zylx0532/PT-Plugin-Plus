@@ -1,4 +1,4 @@
-(function(options) {
+(function(options, Searcher) {
   class Parser {
     constructor() {
       this.haveData = false;
@@ -42,13 +42,14 @@
               completed: item.completed,
               comments: item.numComments,
               site: site,
-              tags: [],
+              tags: this.getTags(item),
               entryName: options.entry.name,
               category: options.searcher.getCategoryById(
                 site,
                 options.url,
                 item.categoryID
-              )
+              ),
+              imdbId: item.imdbID
             };
             results.push(data);
           }
@@ -64,9 +65,17 @@
       }
       return results;
     }
+    getTags(item) {
+      var tag = [{
+        name: "Free",
+        color: "blue"
+      }]
+      if(item.tags.indexOf("FREELEECH")>-1)return tag;
+    }
   }
+
 
   let parser = new Parser(options);
   options.results = parser.getResult();
   console.log(options.results);
-})(options);
+})(options, Searcher);

@@ -5,6 +5,7 @@ import * as BodyParser from "body-parser";
 import * as PATH from "path";
 import * as FS from "fs";
 import { BuildPlugin } from "./BuildPlugin";
+import { SearchData } from "./SearchData";
 
 /**
  * 默认APP
@@ -55,14 +56,26 @@ class App {
       res.send(this.i18n);
     });
 
-    this.express.get("/test/*.json", (req, res) => {
+    const config = JSON.parse(this.systemConfig);
+    this.express.get("/test/searchData.json", (req, res) => {
+      res.send(new SearchData(config).generate());
+    });
+
+    this.express.get("/test/*.*", (req, res) => {
       console.log(req.url);
-      let fileName = req.url.match(/test\/(.+\.json)/)[1];
+      let fileName = (req.url as any).match(/test\/(.[^\?]+)/)[1];
+      console.log(fileName);
       let path = PATH.resolve(__dirname, "../data/");
       let file = PATH.join(path, fileName);
       if (FS.existsSync(file)) {
         let content = FS.readFileSync(PATH.join(path, fileName), "utf-8");
-        res.send(JSON.parse(content));
+        if (fileName.substr(-5) === ".json") {
+          res.send(JSON.parse(content));
+        } else {
+          console.log(PATH.join(path, fileName));
+          res.sendFile(PATH.join(path, fileName));
+          // res.send(content);
+        }
       } else {
         res.send("no file.");
       }

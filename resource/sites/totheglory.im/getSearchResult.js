@@ -1,4 +1,4 @@
-(function(options) {
+(function(options, Searcher) {
   class Parser {
     constructor() {
       this.haveData = false;
@@ -73,10 +73,9 @@
 
         // 对title进行处理，防止出现cf的email protect
         if (title.find("span.__cf_email__")) {
-          let constructor = this.constructor;
           title.find("span.__cf_email__").each(function() {
             $(this).replaceWith(
-              constructor.cfDecodeEmail($(this).data("cfemail"))
+              Searcher.cfDecodeEmail($(this).data("cfemail"))
             );
           });
         }
@@ -146,9 +145,10 @@
           site: site,
           entryName: options.entry.name,
           category: this.getCategory(cells.eq(fieldIndex.category)),
-          tags: this.getTags(row, options.torrentTagSelectors),
+          tags: options.searcher.getRowTags(site, row),
           progress: options.searcher.getFieldValue(site, row, "progress"),
-          status: options.searcher.getFieldValue(site, row, "status")
+          status: options.searcher.getFieldValue(site, row, "status"),
+          imdbId: this.getIMDbId(row)
         };
         results.push(data);
       }
@@ -160,18 +160,25 @@
       return results;
     }
 
-    // cloudflare Email 解码方法，来自 https://usamaejaz.com/cloudflare-email-decoding/
-    // TODO 以后视情况将其改成公用方法
-    static cfDecodeEmail(encodedString) {
-      var email = "",
-        r = parseInt(encodedString.substr(0, 2), 16),
-        n,
-        i;
-      for (n = 2; encodedString.length - n; n += 2) {
-        i = parseInt(encodedString.substr(n, 2), 16) ^ r;
-        email += String.fromCharCode(i);
+    /**
+     * 获取IMDbId
+     * @param {*} row
+     */
+    getIMDbId(row)
+    {
+      try {
+        let link = row.find("a[href*='imdb.com/title/tt']").first().attr("href");
+        if (link)
+        {
+          let imdbId = link.match(/(tt\d+)/);
+          if (imdbId)
+            return imdbId[0];
+        }
+      } catch (error){
+        console.log(error)
+        return null;
       }
-      return email;
+      return null;
     }
 
     /**
@@ -194,34 +201,8 @@
       result.name = img.attr("alt");
       return result;
     }
-
-    /**
-     * 获取标签
-     * @param {*} row
-     * @param {*} selectors
-     * @return array
-     */
-    getTags(row, selectors) {
-      let tags = [];
-      if (selectors && selectors.length > 0) {
-        // 使用 some 避免错误的背景类名返回多个标签
-        selectors.some(item => {
-          if (item.selector) {
-            let result = row.find(item.selector);
-            if (result.length) {
-              tags.push({
-                name: item.name,
-                color: item.color
-              });
-              return true;
-            }
-          }
-        });
-      }
-      return tags;
-    }
   }
   let parser = new Parser(options);
   options.results = parser.getResult();
   console.log(options.results);
-})(options);
+})(options, options.searcher);

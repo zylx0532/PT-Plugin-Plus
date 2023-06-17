@@ -1,12 +1,13 @@
 {
   "name": "RED",
+  "timezoneOffset": "+0000",
   "description": "music",
   "url": "https://redacted.ch/",
   "icon": "https://redacted.ch/favicon.ico",
   "tags": ["音乐"],
   "schema": "GazelleJSONAPI",
   "host": "redacted.ch",
-  "collaborator": "ylxb2016, enigamz",
+  "collaborator": ["ylxb2016", "enigamz"],
   "searchEntryConfig": {
     "skipIMDbId": true
   },
@@ -50,8 +51,22 @@
       "enabled": false
     }
   ],
+  "selectors": {
+    "userSeedingTorrents": {
+      "page": "/ajax.php?action=community_stats&userid=$user.id$",
+      "dataType": "json",
+      "fields": {
+        "seedingSize": {
+          "selector": ["response.seedingsize"],
+          "filters": ["query.replace(/,/g,'').sizeToNumber()"]
+        },
+        "bonus": {
+	      "value":"N/A"
+	    }
+      }
+    }
+  },
   "supportedFeatures": {
-    "imdbSearch": false,
-    "userData": "◐"
+    "imdbSearch": false
   }
 }

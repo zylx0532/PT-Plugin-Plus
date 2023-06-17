@@ -129,7 +129,7 @@ export class ContextMenus {
       contexts: ["browser_action"],
       onclick: () => {
         chrome.tabs.create({
-          url: "https://github.com/ronggang/PT-Plugin-Plus/issues/new"
+          url: "https://github.com/pt-plugins/PT-Plugin-Plus/issues/new"
         });
       }
     });
@@ -165,7 +165,10 @@ export class ContextMenus {
     let documentUrlPatterns: string[] = [`*://${site.host}/*`, `${url}`];
 
     if (site.cdn && site.cdn.length > 0) {
-      documentUrlPatterns.push(...site.cdn);
+      for (let i = 0; i < site.cdn.length; i++) {
+        const url = site.cdn[i]
+        documentUrlPatterns.push(`${url}${url.substr(-1) != '/' ? '/*' : '*'}`, url);
+      }
     }
 
     return documentUrlPatterns;
@@ -184,8 +187,8 @@ export class ContextMenus {
     client: DownloadClient,
     parentId: string
   ) {
-    paths.forEach((path: string) => {
-      let id = `${client.id}**${site.host}**${path}`;
+    paths.forEach((path: string, index: number) => {
+      let id = `${client.id}**${site.host}**${path}**${index}`;
       this.add({
         id,
         title: this.pathHandler.replacePathKey(path, site),
@@ -215,7 +218,8 @@ export class ContextMenus {
    */
   public createSiteMenus(host: string) {
     let site: Site = this.options.sites.find((item: Site) => {
-      return item.host === host;
+      let cdn = [item.url].concat(item.cdn);
+      return item.host === host || cdn.join("|").indexOf(host) > -1;
     });
 
     if (!site) {
@@ -466,7 +470,7 @@ export class ContextMenus {
         });
         chrome.tabs.sendMessage(tabid, {
           action: EAction.showMessage,
-          data: result
+          data: result.status == "" ? this.service.i18n.t("service.contextMenus.sendTorrentToClientError") : result
         });
       })
       .finally(() => {
@@ -509,74 +513,22 @@ export class ContextMenus {
         }
       });
 
-      const sites = this.options.sites;
-      // 以指定的站点进行搜索
-      if (sites && sites.length > 0) {
-        let parentId = `searchInSite`;
-
-        this.add({
-          id: parentId,
-          title: this.service.i18n.t("service.contextMenus.searchInSite"),
-          contexts: ["selection"]
-        });
-
-        // 添加站点
-        sites.forEach((site: Site) => {
-          let id = `searchInSite**${site.host}`;
-          this.add({
-            id,
-            title: `${site.name} - ${site.host}`,
-            parentId: parentId,
-            contexts: ["selection"],
-            onclick: (
-              info: chrome.contextMenus.OnClickData,
-              tab: chrome.tabs.Tab
-            ) => {
-              let data = info.menuItemId.split("**");
-              this.service.controller.searchTorrent(
-                info.selectionText,
-                data[1]
-              );
-            }
-          });
-        });
-      }
-
-      const solutions = this.options.searchSolutions;
-      // 以指定的方案进行搜索
-      if (solutions && solutions.length > 0) {
-        let parentId = `searchInSolution`;
-
-        this.add({
-          id: parentId,
-          title: this.service.i18n.t("service.contextMenus.searchInSolution"),
-          contexts: ["selection"]
-        });
-        solutions.forEach((item: SearchSolution) => {
-          let id = `searchInSolution**${item.id}`;
-          this.add({
-            id,
-            title: `${item.name}`,
-            parentId: parentId,
-            contexts: ["selection"],
-            onclick: (
-              info: chrome.contextMenus.OnClickData,
-              tab: chrome.tabs.Tab
-            ) => {
-              let data = info.menuItemId.split("**");
-              this.service.controller.searchTorrent(
-                info.selectionText,
-                data[1]
-              );
-            }
-          });
-        });
-      }
+      this.pushMoreSearchMenus();
     }
+
+    let imdbMenuId = "searchWithIMDb";
+    // 搜索IMDb相关种子
+    this.add({
+      id: imdbMenuId,
+      title: this.service.i18n.t("service.contextMenus.searchByIMDb"), // "搜索当前IMDb相关种子",
+      contexts: ["link"],
+      targetUrlPatterns: ["*://www.imdb.com/title/tt*"]
+    });
 
     // 搜索IMDb相关种子
     this.add({
-      title: this.service.i18n.t("service.contextMenus.searchByIMDb"), // "搜索当前IMDb相关种子",
+      parentId: imdbMenuId,
+      title: this.service.i18n.t("service.contextMenus.searchByDefault"), // "搜索当前IMDb相关种子",
       contexts: ["link"],
       targetUrlPatterns: ["*://www.imdb.com/title/tt*"],
       onclick: (
@@ -588,6 +540,184 @@ export class ContextMenus {
           if (link && link.length >= 2) {
             this.service.controller.searchTorrent(link[1]);
           }
+        }
+      }
+    });
+
+    this.pushMoreSearchMenus(
+      imdbMenuId,
+      ["link"],
+      ["*://www.imdb.com/title/tt*"],
+      /(tt\d+)/
+    );
+
+    let donbanMenuId = "searchWithDouban";
+    // "搜索当前豆瓣链接相关种子"
+    this.add({
+      id: donbanMenuId,
+      title: this.service.i18n.t("service.contextMenus.searchByDouban"),
+      contexts: ["link"],
+      targetUrlPatterns: ["*://movie.douban.com/subject/*"]
+    });
+
+    // "搜索当前豆瓣链接相关种子"
+    this.add({
+      parentId: donbanMenuId,
+      title: this.service.i18n.t("service.contextMenus.searchByDefault"),
+      contexts: ["link"],
+      targetUrlPatterns: ["*://movie.douban.com/subject/*"],
+      onclick: (
+        info: chrome.contextMenus.OnClickData,
+        tab: chrome.tabs.Tab
+      ) => {
+        if (info.linkUrl) {
+          let link = info.linkUrl.match(/subject\/(\d+)/);
+          if (link && link.length >= 2) {
+            this.service.controller.searchTorrent("douban" + link[1]);
+          }
+        }
+      }
+    });
+
+    this.pushMoreSearchMenus(
+      donbanMenuId,
+      ["link"],
+      ["*://movie.douban.com/subject/*"],
+      /subject\/(\d+)/,
+      "douban"
+    );
+  }
+
+  /**
+   * 添加更多搜索相关菜单
+   * @param _parentId
+   * @param contexts
+   * @param targetUrlPatterns
+   * @param match
+   * @param keyPrefix
+   */
+  private pushMoreSearchMenus(
+    _parentId: string | undefined = undefined,
+    contexts: string[] = ["selection"],
+    targetUrlPatterns: string[] | undefined = undefined,
+    match: RegExp = /(tt\d+)/,
+    keyPrefix: string = ""
+  ) {
+    const sites = this.options.sites;
+    // 以指定的站点进行搜索
+    if (sites && sites.length > 0) {
+      let parentId = `${_parentId}searchInSite`;
+
+      this.add({
+        id: parentId,
+        title: this.service.i18n.t("service.contextMenus.searchInSite"),
+        contexts: contexts,
+        parentId: _parentId,
+        targetUrlPatterns
+      });
+
+      // 添加站点
+      sites.forEach((site: Site) => {
+        let id = `${parentId}**${site.host}`;
+        this.add({
+          id,
+          title: `${site.name} - ${site.host}`,
+          parentId: parentId,
+          contexts: contexts,
+          targetUrlPatterns,
+          onclick: (
+            info: chrome.contextMenus.OnClickData,
+            tab: chrome.tabs.Tab
+          ) => {
+            let data = info.menuItemId.split("**");
+            this.service.debug(
+              this.service.i18n.t("service.contextMenus.searchInSite"),
+              info
+            );
+            if (contexts.includes("link") && info.linkUrl) {
+              let link = info.linkUrl.match(match);
+              if (link && link.length >= 2) {
+                this.service.controller.searchTorrent(
+                  keyPrefix + link[1],
+                  data[1]
+                );
+              }
+            } else {
+              this.service.controller.searchTorrent(
+                info.selectionText,
+                data[1]
+              );
+            }
+          }
+        });
+      });
+    }
+
+    const solutions = this.options.searchSolutions;
+    // 以指定的方案进行搜索
+    if (solutions && solutions.length > 0) {
+      let parentId = `${_parentId}searchInSolution`;
+
+      this.add({
+        id: parentId,
+        title: this.service.i18n.t("service.contextMenus.searchInSolution"),
+        contexts: contexts,
+        parentId: _parentId,
+        targetUrlPatterns
+      });
+      solutions.forEach((item: SearchSolution) => {
+        let id = `${parentId}**${item.id}`;
+        this.add({
+          id,
+          title: `${item.name}`,
+          parentId: parentId,
+          contexts: contexts,
+          targetUrlPatterns,
+          onclick: (
+            info: chrome.contextMenus.OnClickData,
+            tab: chrome.tabs.Tab
+          ) => {
+            this.service.debug(
+              this.service.i18n.t("service.contextMenus.searchInSolution"),
+              info
+            );
+            let data = info.menuItemId.split("**");
+            if (contexts.includes("link") && info.linkUrl) {
+              let link = info.linkUrl.match(match);
+              if (link && link.length >= 2) {
+                this.service.controller.searchTorrent(
+                  keyPrefix + link[1],
+                  data[1]
+                );
+              }
+            } else {
+              this.service.controller.searchTorrent(
+                info.selectionText,
+                data[1]
+              );
+            }
+          }
+        });
+      });
+    }
+
+    // 在所有站点中搜索
+    this.add({
+      title: this.service.i18n.t("service.contextMenus.searchInAllSite"),
+      parentId: _parentId,
+      contexts: contexts,
+      targetUrlPatterns,
+      onclick: (
+        info: chrome.contextMenus.OnClickData,
+        tab: chrome.tabs.Tab
+      ) => {
+        if (info.linkUrl) {
+          let link = info.linkUrl.match(match);
+          if (contexts.includes("link") && link && link.length >= 2) {
+            this.service.controller.searchTorrent(keyPrefix + link[1], "all");
+          }
+        } else {
+          this.service.controller.searchTorrent(info.selectionText, "all");
         }
       }
     });
@@ -789,8 +919,7 @@ export class ContextMenus {
       return null;
     }
     let site: Site = this.options.sites.find((item: Site) => {
-      let cdn = item.cdn || [];
-      item.url && cdn.push(item.url);
+      let cdn = [item.url].concat(item.cdn);
       return item.host == url.host || cdn.join("").indexOf(url.host) > -1;
     });
 

@@ -23,6 +23,12 @@ import i18n from "i18next";
 import { InfoParser } from "@/background/infoParser";
 import { PPF } from "@/service/public";
 
+declare global {
+  interface Window {
+    Drag: any;
+  }
+}
+
 /**
  * 插件背景脚本，会插入到每个页面
  */
@@ -55,7 +61,6 @@ class PTPContent {
     "<div style='display:none;' class='pt-plugin-droper'/>"
   );
   private buttons: any[] = [];
-  private buttonBarHeight: number = 0;
   private logo: JQuery = <any>null;
 
   // 插件是否被重新启用过（暂不可用），onSuspend 事件无法执行。
@@ -73,6 +78,11 @@ class PTPContent {
   public infoParser: InfoParser = new InfoParser();
   // 当前页面选择器配置
   public pageSelector: any = {};
+  // 自动确定工具栏位置
+  public autoPosition: boolean = true;
+
+  // 保存当前工具栏位置key
+  private positionStorageKey = "";
 
   constructor() {
     this.extension = new Extension();
@@ -141,9 +151,8 @@ class PTPContent {
     }
 
     let site = sites.find((item: Site) => {
-      let cdn = item.cdn || [];
-      item.url && cdn.push(item.url);
-      return item.host == host || cdn.join("").indexOf(host) > -1;
+      let cdn = [item.url].concat(item.cdn);
+      return item.host == host || cdn.join("").indexOf(`//${host}`) > -1;
     });
 
     if (site) {
@@ -157,46 +166,69 @@ class PTPContent {
    * 初始化符合条件的附加页面
    */
   private initPages() {
-    if (!this.options.showToolbarOnContentPage) {
-      return;
-    }
-    // 判断当前页面的所属站点是否已经被定义
-    this.site = this.getSiteFromHost(window.location.hostname);
+    this.initSiteConfig().then(() => {
+      this.initPlugins();
+    }).catch(() => {
+      APP.debugMode && console.log("initPages 失败");
+    });
+  }
 
-    if (this.site) {
-      // 适应多域名
-      this.site.url = window.location.origin + "/";
-    }
-
-    // 如果当前站点未定义，则不再继续操作
-    if (this.site && this.site.name) {
-      if (typeof this.site.schema === "string") {
-        this.schema =
-          this.options.system &&
-          this.options.system.schemas &&
-          this.options.system.schemas.find((item: SiteSchema) => {
-            return item.name == this.site.schema;
-          });
-      } else {
-        let site =
-          this.options.system &&
-          this.options.system.sites &&
-          this.options.system.sites.find((item: Site) => {
-            return item.host == this.site.host;
-          });
-        if (site && site.schema && typeof site.schema !== "string") {
-          this.schema = site.schema;
-          this.schema.siteOnly = true;
-        }
+  /**
+   * 初始化站点配置
+   */
+  private initSiteConfig(): Promise<any> {
+    return new Promise<any>((resolve?: any, reject?: any) => {
+      if (!this.options.showToolbarOnContentPage) {
+        reject();
+        return;
       }
-    } else {
-      return;
-    }
+      // 判断当前页面的所属站点是否已经被定义
+      this.site = this.getSiteFromHost(window.location.hostname);
+
+      if (this.site) {
+        // 适应多域名
+        this.site.url = window.location.origin + "/";
+      }
+
+      // 如果当前站点未定义，则不再继续操作
+      if (this.site && this.site.name) {
+        if (typeof this.site.schema === "string") {
+          this.schema =
+            this.options.system &&
+            this.options.system.schemas &&
+            this.options.system.schemas.find((item: SiteSchema) => {
+              return item.name == this.site.schema;
+            });
+        } else {
+          let site =
+            this.options.system &&
+            this.options.system.sites &&
+            this.options.system.sites.find((item: Site) => {
+              return item.host == this.site.host;
+            });
+          if (site && site.schema && typeof site.schema !== "string") {
+            this.schema = site.schema;
+            this.schema.siteOnly = true;
+          }
+        }
+        // 等待页面选择器加载完成后，再加载插件内容
+        this.initPageSelector().finally(() => {
+          resolve();
+        });
+      } else {
+        reject();
+      }
+    });
+  }
+
+  /**
+   * 初始化符合条件的插件
+   */
+  private initPlugins() {
+    this.positionStorageKey = `pt-plugin-${this.site.host}-position`;
 
     this.scripts = [];
     this.styles = [];
-
-    this.initPageSelector();
     // 初始化插件按钮列表
     this.initButtonBar();
     this.initDroper();
@@ -235,7 +267,7 @@ class PTPContent {
     }
 
     // 获取系统定义的网站信息
-    let site =
+    let systemSite =
       this.options.system &&
       this.options.system.sites &&
       this.options.system.sites.find((item: Site) => {
@@ -244,7 +276,7 @@ class PTPContent {
 
     if (!this.site.plugins) {
       this.site.plugins = [];
-    } else if (this.site.schema !== "publicSite") {
+    } else if (this.site.schema !== "publicSite" && systemSite) {
       for (let index = this.site.plugins.length - 1; index >= 0; index--) {
         const item = this.site.plugins[index];
         // 删除非自定义的插件，从系统定义中重新获取
@@ -254,9 +286,9 @@ class PTPContent {
       }
     }
 
-    if (site && site.plugins) {
+    if (systemSite && systemSite.plugins) {
       // 将系统定义的内容添加到最前面，确保基本库优先加载
-      this.site.plugins = site.plugins.concat(this.site.plugins);
+      this.site.plugins = systemSite.plugins.concat(this.site.plugins);
     }
 
     // 网站指定的脚本
@@ -396,20 +428,89 @@ class PTPContent {
       $(".pt-plugin-body").remove();
     }
     this.buttonBar = $("<div class='pt-plugin-body'/>").appendTo(document.body);
-    if (this.options.position == EPluginPosition.left) {
-      this.buttonBar.css({
-        right: "unset"
+
+    // 启用拖放功能
+    if (window.Drag) {
+      let dragTitle = $(
+        "<div class='pt-plugin-drag-title' title='" + i18n.t("dragTitle") + "'>"
+      ).appendTo(this.buttonBar);
+
+      new window.Drag(this.buttonBar.get(0), {
+        handle: dragTitle.get(0),
+        onStop: (result: any) => {
+          console.log(result);
+          this.saveButtonBarPosition(result);
+        }
+      });
+
+      // 双击重置位置
+      dragTitle.on("dblclick", () => {
+        this.resetButtonBarPosition();
       });
     }
+
     this.logo = $(
       "<div class='pt-plugin-logo' title='" + i18n.t("pluginTitle") + "'/>"
     ).appendTo(this.buttonBar);
     this.logo.on("click", () => {
       this.call(EAction.openOptions);
     });
-    this.buttonBarHeight = this.buttonBar.get(0).scrollHeight - 3;
-    // console.log(this.buttonBarHeight);
+    this.initButtonBarPosition();
     this.buttonBar.hide();
+  }
+
+  /**
+   * 初始化工具栏位置
+   */
+  private initButtonBarPosition() {
+    let result = window.localStorage.getItem(this.positionStorageKey);
+    if (result) {
+      try {
+        let position = JSON.parse(result);
+
+        this.buttonBar.css({
+          top: position.top,
+          left: position.left
+        });
+        this.autoPosition = false;
+        return;
+      } catch (error) {
+        console.log(error);
+      }
+    }
+    this.buttonBar.css({
+      top: window.innerHeight / 2,
+      left: "unset"
+    });
+
+    if (this.options.position == EPluginPosition.left) {
+      this.buttonBar.css({
+        right: "unset",
+        left: "5px"
+      });
+    }
+  }
+
+  /**
+   * 重置工具栏位置
+   */
+  private resetButtonBarPosition() {
+    window.localStorage.removeItem(this.positionStorageKey);
+    this.autoPosition = true;
+    this.initButtonBarPosition();
+    this.recalculateButtonBarPosition();
+  }
+
+  /**
+   * 保存工具栏位置
+   * @param position
+   */
+  private saveButtonBarPosition(position: any) {
+    window.localStorage.setItem(
+      this.positionStorageKey,
+      JSON.stringify(position)
+    );
+    this.autoPosition = false;
   }
 
   /**
@@ -501,13 +602,8 @@ class PTPContent {
       this.addDroper(button, options.onDrop, onSuccess, onError);
     }
 
-    let offset = <any>line.outerHeight(true) + <any>button.outerHeight(true);
-    this.buttonBarHeight += offset;
-
     this.buttons.push(button);
-
-    // console.log(this.buttonBarHeight, offset);
-    this.buttonBar.height(this.buttonBarHeight).show();
+    this.recalculateButtonBarPosition();
   }
 
   /**
@@ -522,17 +618,32 @@ class PTPContent {
     if (index != -1) {
       let button = this.buttons[index];
 
-      let offset = <any>button.outerHeight(true);
-      this.buttonBarHeight -= offset;
       let line = button.data("line");
       if (line) {
-        this.buttonBarHeight -= <any>line.outerHeight(true);
         line.remove();
       }
       button.remove();
       this.buttons.splice(index, 1);
-      this.buttonBar.height(this.buttonBarHeight).show();
     }
+
+    this.recalculateButtonBarPosition();
+  }
+
+  /**
+   * 重新计算工具栏位置
+   */
+  public recalculateButtonBarPosition() {
+    if (this.buttons.length > 0) {
+      this.buttonBar.show();
+    } else {
+      this.buttonBar.hide();
+    }
+    if (!this.autoPosition) {
+      return;
+    }
+    this.buttonBar.css({
+      top: window.innerHeight / 2 - <any>this.buttonBar.outerHeight(true) / 2
+    });
   }
 
   /**
@@ -554,8 +665,8 @@ class PTPContent {
       typeof options === "string"
         ? { msg: options }
         : typeof options.msg === "object"
-        ? options.msg
-        : options
+          ? options.msg
+          : options
     );
 
     options.text = options.text || options.msg;
@@ -609,7 +720,8 @@ class PTPContent {
       }
     }
 
-    return path;
+    // 替换目录中的关键字后再返回
+    return this.pathHandler.replacePathKey(path, this.site);
   }
 
   /**
@@ -858,27 +970,35 @@ class PTPContent {
     }
   }
 
-  private initPageSelector() {
-    this.call(EAction.getSiteSelectorConfig, {
-      host: this.site.host,
-      name: location.pathname
-    })
-      .then(result => {
-        this.pageSelector = result;
+  /**
+   * 加载页面选择器
+   */
+  private initPageSelector(): Promise<any> {
+    return new Promise<any>((resolve?: any, reject?: any) => {
+      this.call(EAction.getSiteSelectorConfig, {
+        host: this.site.host,
+        name: location.pathname
       })
-      .catch(() => {
-        // 如果没有当前页面的选择器，则尝试获取通用的选择器
-        this.call(EAction.getSiteSelectorConfig, {
-          host: this.site.host,
-          name: "common"
+        .then(result => {
+          this.pageSelector = result;
+          resolve();
         })
-          .then(result => {
-            this.pageSelector = result;
+        .catch(() => {
+          // 如果没有当前页面的选择器，则尝试获取通用的选择器
+          this.call(EAction.getSiteSelectorConfig, {
+            host: this.site.host,
+            name: "common"
           })
-          .catch(() => {
-            // 没有选择器
-          });
-      });
+            .then(result => {
+              this.pageSelector = result;
+              resolve();
+            })
+            .catch(() => {
+              // 没有选择器
+              resolve();
+            });
+        });
+    });
   }
 
   /**

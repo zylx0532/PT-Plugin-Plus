@@ -1,11 +1,13 @@
 <template>
   <v-footer app fixed>
     <span class="pl-2 grey--text text--darken-1">
-      &copy; {{ $t("app.author") }} 2019, {{ $t("common.version") }} {{version}}
+      &copy; {{ $t("app.author") }} {{ year }}, {{ $t("common.version") }}
+      {{ version }}
       <span
         v-if="isDevelopmentMode && $vuetify.breakpoint.mdAndUp"
         class="deep-orange--text"
-      >{{ words.developmentMode }}</span>
+        >{{ words.developmentMode }}</span
+      >
       <v-chip
         label
         outline
@@ -13,16 +15,18 @@
         disabled
         small
         v-if="isDebugMode && $vuetify.breakpoint.mdAndUp"
-      >{{ $t("common.debugMode") }}</v-chip>
+        >{{ $t("common.debugMode") }}</v-chip
+      >
       <v-btn
         outline
         color="success"
         small
         v-if="newReleases"
-        href="https://github.com/ronggang/PT-Plugin-Plus/releases"
+        href="https://github.com/pt-plugins/PT-Plugin-Plus/releases"
         target="_blank"
         rel="noopener noreferrer nofollow"
-      >{{ $t("common.haveNewReleases") }}, {{ releasesVersion }}</v-btn>
+        >{{ $t("common.haveNewReleases") }}, {{ releasesVersion }}</v-btn
+      >
     </span>
     <v-spacer></v-spacer>
     <v-btn
@@ -37,16 +41,18 @@
       <v-img
         src="./assets/telegram.svg"
         width="16"
-        :style="$vuetify.breakpoint.smAndDown?'max-width:16px':null"
+        :style="$vuetify.breakpoint.smAndDown ? 'max-width:16px' : null"
       />
       <span class="ml-1" v-if="$vuetify.breakpoint.mdAndUp">Telegram</span>
     </v-btn>
-    <input type="file" ref="fileLanguage" style="display:none;" />
+    <input type="file" ref="fileLanguage" style="display: none" />
     <v-menu top offset-y>
       <template v-slot:activator="{ on }">
         <v-btn flat small v-on="on" :icon="$vuetify.breakpoint.smAndDown">
           <v-icon small>language</v-icon>
-          <span class="ml-1" v-if="$vuetify.breakpoint.mdAndUp">{{ $t("common.changeLanguage" )}}</span>
+          <span class="ml-1" v-if="$vuetify.breakpoint.mdAndUp">
+            {{ $t("common.changeLanguage") }}
+          </span>
         </v-btn>
       </template>
 
@@ -59,10 +65,21 @@
       <v-divider></v-divider>
 
       <v-list dense>
-        <v-list-tile v-for="(item, index) in languages" :key="index" @click="changeLanguage(item)">
-          <v-list-tile-title :class="currentLanguage==item.code?'primary--text':''">
+        <v-list-tile
+          v-for="(item, index) in languages"
+          :key="index"
+          @click="changeLanguage(item)"
+        >
+          <v-list-tile-title
+            :class="currentLanguage == item.code ? 'primary--text' : ''"
+          >
             <span>
-              <v-icon small class="mr-1 primary--text" v-if="currentLanguage==item.code">check</v-icon>
+              <v-icon
+                small
+                class="mr-1 primary--text"
+                v-if="currentLanguage == item.code"
+                >check</v-icon
+              >
               <span v-else class="mr-4"></span>
             </span>
             {{ item.name }}
@@ -72,28 +89,32 @@
     </v-menu>
     <v-btn flat small to="/system-logs" :icon="$vuetify.breakpoint.smAndDown">
       <v-icon small>assignment</v-icon>
-      <span class="ml-1" v-if="$vuetify.breakpoint.mdAndUp">{{ $t("common.systemLog") }}</span>
+      <span class="ml-1" v-if="$vuetify.breakpoint.mdAndUp">
+        {{ $t("common.systemLog") }}
+      </span>
     </v-btn>
-
+    <v-btn @click="toggle_dark_mode" flat small :icon="$vuetify.breakpoint.smAndDown">
+      <v-icon small>invert_colors</v-icon>
+      <span class="ml-1" v-if="$vuetify.breakpoint.mdAndUp">
+        {{ $t("common.darkMode") }}
+      </span>
+    </v-btn>
     <v-btn
       v-if="$vuetify.breakpoint.mdAndUp"
       flat
       small
-      href="https://github.com/ronggang/PT-Plugin-Plus/issues"
+      href="/debugger.html"
       target="_blank"
       rel="noopener noreferrer nofollow"
-      :title="$t('navigation.support.bugReport')"
+      :title="$t('navigation.support.debugger')"
     >
       <v-icon small>bug_report</v-icon>
-      <span class="ml-1">{{ $t("navigation.support.bugReport") }}</span>
+      <span class="ml-1">{{ $t("navigation.support.debugger") }}</span>
     </v-btn>
 
-    <v-snackbar
-      v-model="invalidFile"
-      top
-      :timeout="3000"
-      color="error"
-    >{{ $t('footer.invalidFile') }}</v-snackbar>
+    <v-snackbar v-model="invalidFile" top :timeout="3000" color="error">
+      {{ $t("footer.invalidFile") }}
+    </v-snackbar>
   </v-footer>
 </template>
 <script lang="ts">
@@ -115,7 +136,8 @@ export default Vue.extend({
       languages: [] as Array<any>,
       fileInput: null as any,
       currentLanguage: "",
-      invalidFile: false
+      invalidFile: false,
+      year: new Date().getFullYear()
     };
   },
   created() {
@@ -134,9 +156,17 @@ export default Vue.extend({
     APP.getInstallType()
       .then(result => {
         console.log(result, EInstallType.development);
-        this.isDevelopmentMode = result == EInstallType.development;
+        this.isDevelopmentMode = [
+          EInstallType.development,
+          EInstallType.crx
+        ].includes(result);
+        if (result === EInstallType.crx) {
+          this.words.developmentMode = EInstallType.crx;
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        console.log("获取安装方式失败");
+      });
   },
   mounted() {
     this.fileInput = this.$refs.fileLanguage;
@@ -158,7 +188,7 @@ export default Vue.extend({
             }
           }
         })
-        .fail((result: any) => {});
+        .fail((result: any) => { });
     },
 
     /**
@@ -191,10 +221,13 @@ export default Vue.extend({
             this.invalidFile = true;
           }
         };
-        r.onerror = () => {};
+        r.onerror = () => { };
         r.readAsText(fileInput.files[0]);
         fileInput.value = "";
       }
+    },
+    toggle_dark_mode() {
+      this.$root.$emit('ToggleDarkMode');
     },
 
     /**
@@ -210,7 +243,7 @@ export default Vue.extend({
             .then(() => {
               this.currentLanguage = resource.code;
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       } else {
         window.i18nService
@@ -222,7 +255,7 @@ export default Vue.extend({
               code: resource.code
             });
           })
-          .catch(() => {});
+          .catch(() => { });
       }
     },
 

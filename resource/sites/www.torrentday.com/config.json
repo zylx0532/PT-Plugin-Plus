@@ -1,5 +1,6 @@
 {
   "name": "TorrentsTD",
+  "timezoneOffset": "+0000",
   "description": "Torrents - TD",
   "url": "https://www.torrentday.com/",
   "icon": "https://www.torrentday.com/favicon.ico",
@@ -20,11 +21,11 @@
       "fields": {
         "uploaded": {
           "selector": ["span.detailsInfoSpan:contains('Up: ') > span"],
-          "filters": ["query.text().replace(/,/g,'').match(/([\\d.]+ ?[ZEPTGMK]?i?B)/)", "(query && query.length>=2)?(query[1]).sizeToNumber():0"]
+          "filters": ["query.text().replace(/,/g,'').match(/([\\d.]+ ?[ZEPTGMK]?i?B)/)", "(query && query.length>=2)?(query[1]).sizeToNumber():null"]
         },
         "downloaded": {
           "selector": ["span.detailsInfoSpan:contains('Down: ') > span"],
-          "filters": ["query.text().replace(/,/g,'').match(/([\\d.]+ ?[ZEPTGMK]?i?B)/)", "(query && query.length>=2)?(query[1]).sizeToNumber():0"]
+          "filters": ["query.text().replace(/,/g,'').match(/([\\d.]+ ?[ZEPTGMK]?i?B)/)", "(query && query.length>=2)?(query[1]).sizeToNumber():null"]
         },
         "ratio": {
           "selector": "span.detailsInfoSpan:contains('Ratio: ') > span",
@@ -47,6 +48,10 @@
         },
         "seedingSize": {
           "value": -1
+        },
+        "messageCount": {
+          "selector": ["a[href='/m']:contains('You have')"],
+          "filters": ["query.text().match(/(\\d+)/)", "(query && query.length>=2)?parseInt(query[1]):0"]
         }
       }
     },

@@ -1,20 +1,11 @@
-if (!"".getQueryString) {
-  String.prototype.getQueryString = function(name, split) {
-    if (split == undefined) split = "&";
-    var reg = new RegExp(
-        "(^|" + split + "|\\?)" + name + "=([^" + split + "]*)(" + split + "|$)"
-      ),
-      r;
-    if ((r = this.match(reg))) return decodeURI(r[2]);
-    return null;
-  };
-}
-
-(function(options, Searcher) {
+/**
+ * NexusPHP 默认搜索结果解析类
+ */
+(function (options, Searcher) {
   class Parser {
     constructor() {
       this.haveData = false;
-      if (/takelogin\.php/.test(options.responseText)) {
+      if (/takelogin\.php|<form action="\?returnto=/.test(options.responseText)) {
         options.status = ESearchResultParseStatus.needLogin; //`[${options.site.name}]需要登录后再搜索`;
         return;
       }
@@ -31,6 +22,7 @@ if (!"".getQueryString) {
       }
 
       this.haveData = true;
+      this.site = options.site;
     }
 
     /**
@@ -83,14 +75,14 @@ if (!"".getQueryString) {
       if (site.url.lastIndexOf("/") != site.url.length - 1) {
         site.url += "/";
       }
-
+      //2023.5.10 fix byr.pt 不显示数据，下列div.icons.*是为了单独适配
       // 获取字段所在的列
       for (let index = 0; index < header.length; index++) {
         let cell = header.eq(index);
         let text = cell.text();
 
         // 评论数
-        if (cell.find("img.comments").length) {
+        if (cell.find(".comments").length) {
           fieldIndex.comments = index;
           fieldIndex.author =
             index == fieldIndex.author ? -1 : fieldIndex.author;
@@ -98,7 +90,7 @@ if (!"".getQueryString) {
         }
 
         // 发布时间
-        if (cell.find("img.time").length) {
+        if (cell.find("img.time,div.date,div.icons.time").length) {
           fieldIndex.time = index;
           fieldIndex.author =
             index == fieldIndex.author ? -1 : fieldIndex.author;
@@ -106,7 +98,7 @@ if (!"".getQueryString) {
         }
 
         // 大小
-        if (cell.find("img.size").length) {
+        if (cell.find("img.size,div[alt='size'],div.icons.size").length) {
           fieldIndex.size = index;
           fieldIndex.author =
             index == fieldIndex.author ? -1 : fieldIndex.author;
@@ -114,7 +106,7 @@ if (!"".getQueryString) {
         }
 
         // 种子数
-        if (cell.find("img.seeders").length) {
+        if (cell.find("img.seeders,div[alt='seeders'],div.icons.seeders").length) {
           fieldIndex.seeders = index;
           fieldIndex.author =
             index == fieldIndex.author ? -1 : fieldIndex.author;
@@ -122,7 +114,7 @@ if (!"".getQueryString) {
         }
 
         // 下载数
-        if (cell.find("img.leechers").length) {
+        if (cell.find("img.leechers,div[alt='leechers'],div.icons.leechers").length) {
           fieldIndex.leechers = index;
           fieldIndex.author =
             index == fieldIndex.author ? -1 : fieldIndex.author;
@@ -130,7 +122,7 @@ if (!"".getQueryString) {
         }
 
         // 完成数
-        if (cell.find("img.snatched").length) {
+        if (cell.find("img.snatched,div[alt='snatched'],div.icons.snatched").length) {
           fieldIndex.completed = index;
           fieldIndex.author =
             index == fieldIndex.author ? -1 : fieldIndex.author;
@@ -146,13 +138,21 @@ if (!"".getQueryString) {
         }
       }
 
+      if (options.entry.fieldIndex) {
+        fieldIndex = Object.assign(fieldIndex, options.entry.fieldIndex);
+      }
+
       try {
         // 遍历数据行
         for (let index = beginRowIndex; index < rows.length; index++) {
           const row = rows.eq(index);
+
+          // FIX https://github.com/pt-plugins/PT-Plugin-Plus/issues/347
+          row.attr('id') === 'zhiding' && row.removeAttr('id');
+
           let cells = row.find(">td");
 
-          let title = this.getTitle(row);
+          let title = this.getTitle(row, cells, fieldIndex);
 
           // 没有获取标题时，继续下一个
           if (title.length == 0) {
@@ -167,20 +167,7 @@ if (!"".getQueryString) {
           }
 
           // 获取下载链接
-          let url = row.find("img.download").parent();
-
-          if (url.length) {
-            if (url.get(0).tagName !== "A") {
-              let id = link.getQueryString("id");
-              url = `download.php?id=${id}`;
-            } else {
-              url = url.attr("href");
-            }
-          } else {
-            let id = link.getQueryString("id");
-            url = `download.php?id=${id}`;
-          }
-
+          let url = this.getDownloadLink(row, link);
           if (url && url.substr(0, 2) === "//") {
             // 适配HUDBT、WHU这样以相对链接开头
             url = `${site_url_help.protocol}://${url}`;
@@ -192,51 +179,40 @@ if (!"".getQueryString) {
             continue;
           }
 
-          url =
-            url +
-            (site && site.passkey ? "&passkey=" + site.passkey : "") +
-            "&https=1";
+          url = url +
+            (site && site.passkey ? "&passkey=" + site.passkey : "");
 
           let data = {
             title: title.attr("title") || title.text(),
             subTitle: this.getSubTitle(title, row),
             link,
             url,
-            size: cells.eq(fieldIndex.size).html() || 0,
+            size: this.getFieldValue(row, cells, fieldIndex, "size") || 0,
             time:
               fieldIndex.time == -1
                 ? ""
                 : this.getTime(cells.eq(fieldIndex.time)),
-            author:
-              fieldIndex.author == -1
-                ? ""
-                : cells.eq(fieldIndex.author).text() || "",
-            seeders:
-              fieldIndex.seeders == -1
-                ? ""
-                : cells.eq(fieldIndex.seeders).text() || 0,
+            author: this.getFieldValue(row, cells, fieldIndex, "author") || "",
+            seeders: this.getFieldValue(row, cells, fieldIndex, "seeders") || 0,
             leechers:
-              fieldIndex.leechers == -1
-                ? ""
-                : cells.eq(fieldIndex.leechers).text() || 0,
+              this.getFieldValue(row, cells, fieldIndex, "leechers") || 0,
             completed:
-              fieldIndex.completed == -1
-                ? ""
-                : cells.eq(fieldIndex.completed).text() || 0,
+              this.getFieldValue(row, cells, fieldIndex, "completed") || 0,
             comments:
-              fieldIndex.comments == -1
-                ? ""
-                : cells.eq(fieldIndex.comments).text() || 0,
+              this.getFieldValue(row, cells, fieldIndex, "comments") || 0,
             site: site,
-            tags: this.getTags(row, options.torrentTagSelectors),
+            tags: Searcher.getRowTags(this.site, row),
             entryName: options.entry.name,
             category:
               fieldIndex.category == -1
                 ? null
-                : this.getCategory(cells.eq(fieldIndex.category)),
+                : this.getFieldValue(row, cells, fieldIndex, "category") ||
+                this.getCategory(cells.eq(fieldIndex.category)),
             progress: Searcher.getFieldValue(site, row, "progress"),
-            status: Searcher.getFieldValue(site, row, "status")
+            status: Searcher.getFieldValue(site, row, "status"),
+            imdbId: this.getIMDbId(row)
           };
+
           results.push(data);
         }
       } catch (error) {
@@ -246,6 +222,38 @@ if (!"".getQueryString) {
       }
 
       return results;
+    }
+
+    /**
+     * 获取指定字段内容
+     * @param {*} row
+     * @param {*} cells
+     * @param {*} fieldIndex
+     * @param {*} fieldName
+     */
+    getFieldValue(row, cells, fieldIndex, fieldName, returnCell) {
+      let parent = row;
+      let cell = null;
+      if (
+        cells &&
+        fieldIndex &&
+        fieldIndex[fieldName] !== undefined &&
+        fieldIndex[fieldName] !== -1
+      ) {
+        cell = cells.eq(fieldIndex[fieldName]);
+        parent = cell || row;
+      }
+
+      let result = Searcher.getFieldValue(this.site, parent, fieldName);
+
+      if (!result && cell) {
+        if (returnCell) {
+          return cell;
+        }
+        result = cell.text();
+      }
+
+      return result;
     }
 
     /**
@@ -259,38 +267,56 @@ if (!"".getQueryString) {
           .html(cell.html().replace("<br>", " "))
           .text();
       }
+      if (options.site.host === "pt.sjtu.edu.cn") {
+        if (time.match(/\d+[分时天月年]/g)) {
+          time = Date.now() - this._parseTime(time)
+          time = new Date(time).toLocaleString("zh-CN", { hour12: false }).replace(/\//g, '-')
+        }
+      }
       return time || "";
     }
 
-    /**
-     * 获取标签
-     * @param {*} row
-     * @param {*} selectors
-     * @return array
-     */
-    getTags(row, selectors) {
-      let tags = [];
-      if (selectors && selectors.length > 0) {
-        selectors.forEach(item => {
-          if (item.selector) {
-            let result = row.find(item.selector);
-            if (result.length) {
-              tags.push({
-                name: item.name,
-                color: item.color
-              });
-            }
-          }
-        });
-      }
-      return tags;
+    _parseTime(timeString) {
+      const timeMatch = timeString.match(/\d+[分时天月年]/g)
+      let length = 0
+      timeMatch.forEach(time => {
+        const timeMatch = time.match(/(\d+)([分时天月年])/)
+        const number = parseInt(timeMatch[1])
+        const unit = timeMatch[2]
+        switch (true) {
+          case unit === '分':
+            length += number
+            break
+          case unit === '时':
+            length += number * 60
+            break
+          case unit === '天':
+            length += number * 60 * 24
+            break
+          case unit === '月':
+            length += number * 60 * 24 * 30
+            break
+          case unit === '年':
+            length += number * 60 * 24 * 365
+            break
+          default:
+        }
+      })
+      return length * 60 * 1000
     }
 
     /**
      * 获取标题
      */
-    getTitle(row) {
-      let title = row.find("a[href*='hit'][title]").first();
+    getTitle(row, cells, fieldIndex) {
+      let title =
+        this.getFieldValue(row, cells, fieldIndex, "title", true) ||
+        row.find("a[href*='hit'][title]:not(a[href*='comment'])").first();
+
+      if (typeof title === "string") {
+        return title;
+      }
+
       if (title.length == 0) {
         title = row.find("a[href*='hit']:has(b)").first();
       }
@@ -316,13 +342,44 @@ if (!"".getQueryString) {
     }
 
     /**
+     * 获取IMDbId
+     * @param {*} row
+     */
+    getIMDbId(row)
+    {
+      let imdbId = Searcher.getFieldValue(this.site, row, "imdbId");
+      if (imdbId) {
+        return imdbId;
+      }
+
+      try {
+        let link = row.find("a[href*='imdb.com/title/tt']").first().attr("href");
+        if (link)
+        {
+          imdbId = link.match(/(tt\d+)/);
+          if (imdbId)
+            return imdbId[0];
+        }
+      } catch (error){
+        console.log(error)
+        return null;
+      }
+      return null;
+    }
+
+    /**
      * 获取副标题
      * @param {*} title
      * @param {*} row
      */
     getSubTitle(title, row) {
+      let subTitle = Searcher.getFieldValue(this.site, row, "subTitle");
+      if (subTitle) {
+        return subTitle;
+      }
+
       try {
-        let subTitle = title
+        subTitle = title
           .parent()
           .html()
           .split("<br>");
@@ -349,6 +406,7 @@ if (!"".getQueryString) {
 
             case "tp.m-team.cc":
             case "pt.m-team.cc":
+            case "kp.m-team.cc":
               title = row.find("a[href*='hit'][title]").last();
               subTitle = title
                 .parent()
@@ -380,6 +438,40 @@ if (!"".getQueryString) {
       } catch (error) {
         return "";
       }
+    }
+
+    // 很
+    getDownloadLink(row, link) {
+      let url;
+      switch (options.site.host) {
+        case 'hdsky.me': {
+          let url_another = row.find('form[action*="download.php"]:eq(0)')
+          if (url_another.length > 0) {
+            url = url_another.attr('action')
+            break;
+          }
+
+        }
+
+        default: {
+          let url_another = row.find("img.download").parent();
+
+          if (url_another.length) {
+            if (url_another.get(0).tagName !== "A") {
+              let id = link.getQueryString("id");
+              url = `download.php?id=${id}`;
+            } else {
+              url = url_another.attr("href");
+            }
+          } else {
+            let id = link.getQueryString("id");
+            url = `download.php?id=${id}`;
+          }
+          url = url + "&https=1"
+        }
+      }
+
+      return url;
     }
 
     /**

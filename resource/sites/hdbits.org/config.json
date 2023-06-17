@@ -1,5 +1,6 @@
 {
   "name": "HDB",
+  "timezoneOffset": "+0000",
   "description": "HDB",
   "url": "https://hdbits.org/",
   "icon": "https://hdbits.org/favicon.ico",
@@ -15,7 +16,33 @@
     "scripts": ["/schemas/NexusPHP/common.js", "browse.js"]
   }],
   "host": "hdbits.org",
-  "searchEntryConfig": {
+  "levelRequirements": [
+    {
+      "level": "1",
+      "name": "1080i",
+      "interval": "4",
+      "downloaded": "30GB",
+      "ratio": "0.95",
+      "privilege": "You can view NFOs and request reseeds on poorly seeded torrents."
+    },
+    {
+      "level": "2",
+      "name": "1080p",
+      "interval": "4",
+      "downloaded": "500GB",
+      "ratio": "1.4",
+      "privilege": "As 1080i"
+    },
+    {
+      "level": "3",
+      "name": "UHD",
+      "interval": "4",
+      "downloaded": "500GB",
+      "ratio": "2.5",
+      "privilege": "As 1080i"
+    }
+  ],
+"searchEntryConfig": {
     "page": "/browse.php",
     "queryString": "search=$key$",
     "resultType": "html",
@@ -25,100 +52,117 @@
       "name": "IMDB",
       "keyAutoMatch": "^(tt\\d+)$",
       "queryString": "imdb=$key$"
-    }]
+    }],
+    "fieldSelector": {
+      "progress": {
+        "selector": ["span.tag.tag_seeding, span.tag.tag_completed", "span.tag.tag_leeching", ""],
+        "switchFilters": [
+          ["100"],
+          ["0"],
+          ["null"]
+        ]
+      },
+      "status": {
+        "selector": ["span.tag.tag_seeding", "span.tag.tag_completed", "span.tag.tag_leeching"],
+        "switchFilters": [
+          ["2"],
+          ["255"],
+          ["1"]
+        ]
+      }
+    }
   },
   "searchEntry": [{
-    "name": "全部",
-    "enabled": true
-  },
-  {
-    "queryString": "cat=1",
-    "name": "Movie",
-    "enabled": false
-  },
-  {
-    "queryString": "cat=2",
-    "name": "TV",
-    "enabled": false
-  },
-  {
-    "queryString": "cat=3",
-    "name": "Documentary",
-    "enabled": false
-  },
-  {
-    "queryString": "cat=4",
-    "name": "Music",
-    "enabled": false
-  },
-  {
-    "queryString": "cat=5",
-    "name": "Sport",
-    "enabled": false
-  },
-  {
-    "queryString": "cat=6",
-    "name": "Audio Track",
-    "enabled": false
-  },
-  {
-    "queryString": "cat=7",
-    "name": "XXX",
-    "enabled": false
-  },
-  {
-    "queryString": "cat=8",
-    "name": "Misc/Demo",
-    "enabled": false
-  }],
+      "name": "全部",
+      "enabled": true
+    },
+    {
+      "queryString": "cat=1",
+      "name": "Movie",
+      "enabled": false
+    },
+    {
+      "queryString": "cat=2",
+      "name": "TV",
+      "enabled": false
+    },
+    {
+      "queryString": "cat=3",
+      "name": "Documentary",
+      "enabled": false
+    },
+    {
+      "queryString": "cat=4",
+      "name": "Music",
+      "enabled": false
+    },
+    {
+      "queryString": "cat=5",
+      "name": "Sport",
+      "enabled": false
+    },
+    {
+      "queryString": "cat=6",
+      "name": "Audio Track",
+      "enabled": false
+    },
+    {
+      "queryString": "cat=7",
+      "name": "XXX",
+      "enabled": false
+    },
+    {
+      "queryString": "cat=8",
+      "name": "Misc/Demo",
+      "enabled": false
+    }
+  ],
   "categories": [{
     "entry": "browse.php?",
     "result": "cat=$id$",
     "category": [{
-      "id": 1,
-      "name": "Movie"
-    },
-    {
-      "id": 2,
-      "name": "TV"
-    },
-    {
-      "id": 3,
-      "name": "Documentary"
-    },
-    {
-      "id": 4,
-      "name": "Music"
-    },
-    {
-      "id": 5,
-      "name": "Sport"
-    },
-    {
-      "id": 6,
-      "name": "Audio Track"
-    },
-    {
-      "id": 7,
-      "name": "XXX"
-    },
-    {
-      "id": 8,
-      "name": "Misc/Demo"
-    }]
+        "id": 1,
+        "name": "Movie"
+      },
+      {
+        "id": 2,
+        "name": "TV"
+      },
+      {
+        "id": 3,
+        "name": "Documentary"
+      },
+      {
+        "id": 4,
+        "name": "Music"
+      },
+      {
+        "id": 5,
+        "name": "Sport"
+      },
+      {
+        "id": 6,
+        "name": "Audio Track"
+      },
+      {
+        "id": 7,
+        "name": "XXX"
+      },
+      {
+        "id": 8,
+        "name": "Misc/Demo"
+      }
+    ]
   }],
   "torrentTagSelectors": [{
     "name": "Free",
-    "selector": "a[title^='100% FL:']",
-    "color": "blue"
+    "selector": "a[title^='100% FL:']"
   }, {
     "name": "50%",
-    "selector": "a[title^='50% Free Leech:']",
-    "color": "orange"
+    "selector": "a[title^='50% Free Leech:']"
   }, {
     "name": "25%",
-    "selector": "a[title^='25% Free Leech:']",
-    "color": "indigo"
+    "selector": "a[title^='25% Free Leech:']"
   }],
   "selectors": {
     "userBaseInfo": {
@@ -137,8 +181,8 @@
           "filters": ["query.length>0"]
         },
         "messageCount": {
-          "selector": ["span.js-notifications-count"],
-          "filters": ["query ? (query.text().match(/(\\d+)/) ? parseInt(query[0]):'0') : '0'"]
+          "selector": ["a.alert-box--pm, span.js-notifications-count"],
+          "filters": ["query.text().match(/(\\d+)/)", "(query && query.length>=2)?parseInt(query[1]):0"]
         }
       }
     },
@@ -147,11 +191,11 @@
       "fields": {
         "uploaded": {
           "selector": ["td.rowhead:contains('Uploaded') + td"],
-          "filters": ["query.text().replace(/,/g,'').match(/([\\d.]+ ?[ZEPTGMK]?i?B)/)", "(query && query.length>=2)?(query[1]).sizeToNumber():0"]
+          "filters": ["query.text().replace(/,/g,'').match(/([\\d.]+ ?[ZEPTGMK]?i?B)/)", "(query && query.length>=2)?(query[1]).sizeToNumber():null"]
         },
         "downloaded": {
           "selector": ["td.rowhead:contains('Downloaded') + td"],
-          "filters": ["query.text().replace(/,/g,'').match(/([\\d.]+ ?[ZEPTGMK]?i?B)/)", "(query && query.length>=2)?(query[1]).sizeToNumber():0"]
+          "filters": ["query.text().replace(/,/g,'').match(/([\\d.]+ ?[ZEPTGMK]?i?B)/)", "(query && query.length>=2)?(query[1]).sizeToNumber():null"]
         },
         "ratio": {
           "selector": "td.rowhead:contains('Share ratio') + td",

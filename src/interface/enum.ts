@@ -12,6 +12,14 @@ export enum ESizeUnit {
 }
 
 /**
+ * 数据请求类型
+ */
+export enum ERequestType {
+  JSON = "json",
+  TEXT = "urlencode"
+}
+
+/**
  * 数据请求返回类型
  */
 export enum ERequestResultType {
@@ -203,8 +211,10 @@ export enum EAction {
   getAllTorrentCollectionLinks = "getAllTorrentCollectionLinks",
   // 恢复Cookies
   restoreCookies = "restoreCookies",
-  // 重置站点图标缓存
+  // 重置所有站点图标缓存
   resetFavicons = "resetFavicons",
+  // 重置单个站点图标缓存
+  resetFavicon = "resetFavicon",
   // 获取备份文件原始数据
   getBackupRawData = "getBackupRawData",
   // 测试备份服务器是否可连接
@@ -235,7 +245,16 @@ export enum EAction {
   // 重置辅种任务
   resetKeepUploadTask = "resetKeepUploadTask",
   // 更新辅种任务
-  updateKeepUploadTask = "updateKeepUploadTask"
+  updateKeepUploadTask = "updateKeepUploadTask",
+
+  // 重置下载历史
+  resetDownloadHistory = "resetDownloadHistory",
+
+  // 添加调试信息
+  pushDebugMsg = "pushDebugMsg",
+  updateDebuggerTabId = "updateDebuggerTabId",
+  // 获取热门搜索
+  getTopSearches = "getTopSearches"
 }
 
 /**
@@ -279,7 +298,8 @@ export enum EModule {
   background = "background",
   content = "content",
   options = "options",
-  popup = "popup"
+  popup = "popup",
+  debugger = "debugger"
 }
 
 /**
@@ -333,8 +353,11 @@ export enum ECommonKey {
  * 插件安装方式
  */
 export enum EInstallType {
+  // 相当于 zip 解压方式安装
   development = "development",
-  normal = "normal"
+  normal = "normal",
+  // crx 自定义类型，官方api中无此状态
+  crx = "crx"
 }
 
 // 当点击预选条目时，搜索模式
@@ -375,7 +398,7 @@ export enum EPluginPosition {
  * 相关Wiki链接
  */
 export enum EWikiLink {
-  faq = "https://github.com/ronggang/PT-Plugin-Plus/wiki/frequently-asked-questions"
+  faq = "https://github.com/pt-plugins/PT-Plugin-Plus/wiki/frequently-asked-questions"
 }
 
 /**
@@ -388,7 +411,8 @@ export enum ERestoreContent {
   collection = "collection",
   cookies = "cookies",
   searchResultSnapshot = "searchResultSnapshot",
-  keepUploadTask = "keepUploadTask"
+  keepUploadTask = "keepUploadTask",
+  downloadHistory = "downloadHistory"
 }
 
 export enum EBrowserType {

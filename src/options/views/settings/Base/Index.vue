@@ -180,6 +180,7 @@
 
                     <!-- 允许备份Cookies -->
                     <v-switch
+                      v-if="checkOptionalPermission('cookies')"
                       color="success"
                       v-model="options.allowBackupCookies"
                       :label="$t('settings.base.allowBackupCookies')"
@@ -267,6 +268,12 @@
                       color="success"
                       v-model="options.search.saveKey"
                       :label="$t('settings.base.saveSearchKey')"
+                    ></v-switch>
+
+                    <v-switch
+                      color="success"
+                      v-model="options.allowSaveSnapshot"
+                      :label="$t('settings.base.allowSaveSnapshot')"
                     ></v-switch>
 
                     <v-switch
@@ -520,12 +527,12 @@ export default Vue.extend({
         allowBackupCookies: false,
         encryptBackupData: false,
         encryptMode: EEncryptMode.AES,
-        encryptSecretKey: ""
+        encryptSecretKey: "",
+        allowSaveSnapshot: true
       } as Options,
       units: [] as any,
       hours: [] as any,
       minutes: [] as any,
-      downloadHistory: [] as any,
       haveError: false,
       haveSuccess: false,
       successMsg: "",
@@ -553,7 +560,6 @@ export default Vue.extend({
       if (!(this.$refs.form as any).validate()) {
         this.activeTab = "base";
         (this.$refs.defaultClient as any).focus();
-        return;
       }
 
       if (!this.options.apiKey) {
@@ -724,6 +730,10 @@ export default Vue.extend({
           this.successMsg = this.$t("common.copyed").toString();
         })
         .catch(() => {});
+    },
+
+    checkOptionalPermission(key: string): boolean {
+      return PPF.checkOptionalPermission(key);
     }
   },
   created() {
@@ -740,11 +750,6 @@ export default Vue.extend({
     for (let index = 0; index < 60; index += 5) {
       this.minutes.push(`0${index}`.substr(-2));
     }
-
-    extension.sendRequest(EAction.getDownloadHistory).then((result: any) => {
-      console.log("downloadHistory", result);
-      this.downloadHistory = result;
-    });
 
     if (this.options.apiKey) {
       if (this.options.apiKey.omdb && this.options.apiKey.omdb.length > 0) {
@@ -784,9 +789,12 @@ export default Vue.extend({
       ).toString();
     }
   },
-  watch: {
-    successMsg() {
-      this.haveSuccess = this.successMsg != "";
+  watch: { 
+    successMsg: {
+      handler() {
+        this.haveSuccess = this.successMsg != "";
+      },
+      deep: true,
     },
     errorMsg() {
       this.haveError = this.errorMsg != "";

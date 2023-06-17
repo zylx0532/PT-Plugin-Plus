@@ -116,13 +116,21 @@ export class User {
         .then((result: any) => {
           console.log("userBaseInfo", host, result);
           userInfo = Object.assign({}, result);
-          if (userInfo.name || userInfo.id) {
+          // 是否已定义已登录选择器
+          if (rule && rule.fields && rule.fields.isLogged) {
+            // 如果已定义则以选择器匹配为准
+            if (userInfo.isLogged && (userInfo.name || userInfo.id)) {
+              userInfo.isLogged = true;
+            } else {
+              userInfo.isLogged = false;
+            }
+          } else if (userInfo.name || userInfo.id) {
             userInfo.isLogged = true;
           }
 
           if (!userInfo.isLogged) {
             userInfo.lastUpdateStatus = EUserDataRequestStatus.needLogin;
-            this.updateStatus(site, userInfo);
+            //this.updateStatus(site, userInfo);
 
             rejectFN(
               APP.createErrorMessage({
@@ -144,14 +152,16 @@ export class User {
           if (userInfo.name || userInfo.id) {
             let url = `${this.getSiteURL(site)}${rule.page
               .replace("$user.id$", userInfo.id)
-              .replace("$user.name$", userInfo.name)}`;
+              .replace("$user.name$", userInfo.name)
+              .replace("$user.bonusPage$", userInfo.bonusPage)
+              .replace("$user.unsatisfiedsPage$", userInfo.unsatisfiedsPage)}`;
             // 上次请求未完成时，直接返回最近的数据
             if (this.checkQueue(host, url)) {
               resolve(userInfo);
               return;
             }
 
-            this.getInfos(host, url, rule)
+            this.getInfos(host, url, rule, site, userInfo)
               .then((result: any) => {
                 userInfo = Object.assign(userInfo, result);
 
@@ -163,12 +173,12 @@ export class User {
               })
               .catch((error: any) => {
                 userInfo.lastUpdateStatus = EUserDataRequestStatus.unknown;
-                this.updateStatus(site, userInfo);
+                //this.updateStatus(site, userInfo);
                 rejectFN(APP.createErrorMessage(error));
               });
           } else {
             userInfo.lastUpdateStatus = EUserDataRequestStatus.unknown;
-            this.updateStatus(site, userInfo);
+            //this.updateStatus(site, userInfo);
             rejectFN(
               APP.createErrorMessage({
                 status: EUserDataRequestStatus.unknown,
@@ -179,7 +189,8 @@ export class User {
         })
         .catch((error: any) => {
           userInfo.lastUpdateStatus = EUserDataRequestStatus.unknown;
-          this.updateStatus(site, userInfo);
+          console.log("getInfos Error :",error);
+          //this.updateStatus(site, userInfo);
           rejectFN(APP.createErrorMessage(error));
         });
     });
@@ -193,7 +204,7 @@ export class User {
   public getMoreInfos(site: Site, userInfo: UserInfo): Promise<any> {
     return new Promise<any>((resolve?: any, reject?: any) => {
       let requests: any[] = [];
-      let selectors = ["userSeedingTorrents"];
+      let selectors = ["userSeedingTorrents", "bonusExtendInfo", "hnrExtendInfo", "levelExtendInfo", "userUploadedTorrents"];
 
       selectors.forEach((name: string) => {
         let host = site.host as string;
@@ -202,7 +213,9 @@ export class User {
         if (rule) {
           let url = `${this.getSiteURL(site)}${rule.page
             .replace("$user.id$", userInfo.id)
-            .replace("$user.name$", userInfo.name)}`;
+            .replace("$user.name$", userInfo.name)
+            .replace("$user.bonusPage$", userInfo.bonusPage)
+            .replace("$user.unsatisfiedsPage$", userInfo.unsatisfiedsPage)}`;
           // 上次请求未完成时，跳过
           if (this.checkQueue(host, url)) {
             return;
@@ -277,6 +290,19 @@ export class User {
           console.log(error);
         }
       }
+      let headers = rule.headers;
+      if (headers && userInfo) {
+        try {
+          for (const key in headers) {
+            if (headers.hasOwnProperty(key)) {
+              const value = headers[key];
+              headers[key] = PPF.replaceKeys(value, userInfo, "user");
+            }
+          }
+        } catch (error) {
+          console.log(error);
+        }
+      }
 
       /**
        * 是否有脚本解析器
@@ -293,10 +319,8 @@ export class User {
         method: rule.requestMethod || ERequestMethod.GET,
         dataType: "text",
         data: requestData,
-        timeout:
-          (this.service.options.search &&
-            this.service.options.search.timeout) ||
-          30000
+        headers: rule.headers,
+        timeout: this.service.options.connectClientTimeout || 30000
       })
         .done(result => {
           this.removeQueue(host, url);
@@ -327,11 +351,15 @@ export class User {
             }
           }
         })
-        .fail(error => {
+        .fail((jqXHR, textStatus, errorThrown) => {
           this.removeQueue(host, url);
           PPF.updateBadge(--this.requestQueueCount);
-          this.service.debug(error);
-          reject(error);
+          let msg = this.service.i18n.t("service.searcher.siteNetworkFailed", {
+            site,
+            msg: `${jqXHR.status} ${errorThrown}, ${textStatus}`
+          });
+          this.service.debug(msg, host, url, jqXHR.responseText);
+          reject(msg);
         });
 
       this.addQueue(host, url, request);
@@ -448,6 +476,26 @@ export class User {
       } else {
         resolve(true);
       }
+    });
+  }
+
+  // MAM需要在访问API时传入存于Cookies中的mam_id，构建这个辅助方法以便获取Cookie
+  public getCookie(site: Site, needle: String): Promise<any> {
+    return new Promise((resolve, reject) => {
+      PPF.checkPermissions(["cookies"]).then(() => {
+        this.service.config.getCookiesFromSite(site).then((result) => {
+          for (const cookie of result.cookies) {
+            if (cookie["name"] === needle) {
+              resolve(cookie["value"]);
+            }
+          }
+          resolve("");
+        }).catch(error => {
+          reject(error);
+        });
+      }).catch(error => {
+        reject(error);
+      });
     });
   }
 }

@@ -1,6 +1,6 @@
 <template>
   <div class="search-solution-editor">
-    <v-card color="grey lighten-4" class="body">
+    <v-card :color="$vuetify.dark ? '' : 'grey lighten-4'" class="body">
       <v-card-text>
         <v-form v-model="isValid" class="content">
           <v-layout row>
@@ -301,7 +301,9 @@ export default Vue.extend({
     .bottom {
       position: absolute;
       bottom: 0;
-      width: 100%;
+      width: 99%;
+      max-height: 80px;
+      overflow-y: auto;
     }
   }
 }
